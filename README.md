@@ -1,7 +1,7 @@
 # Task Manager
 
 ## Overview
-This Task Manager application allows users to manage their tasks by entering task details such as task name, deadline date and time, and status. Users can add tasks, mark them as complete or in progress, delete tasks, and prioritize them.
+This Task Manager application allows users to manage their tasks by entering task details such as task name, deadline date and time, and status. Users can add tasks, mark them as complete or in progress, delete tasks, and prioritise them.
 
 ## Requirements
 - Python 3.x
@@ -20,7 +20,7 @@ This Task Manager application allows users to manage their tasks by entering tas
 3. Enter the task details including task name, deadline date, deadline time, and status (To Do, In Progress, or Complete).
 4. Click on the "Add Task" button to add the task to the list.
 5. Tasks will be displayed in a treeview with columns for Task, Deadline, and Status.
-6. Right-click on a task to access the context menu with options to prioritize the task.
+6. Right-click on a task to access the context menu with options to prioritise the task.
 7. Use the "Mark Complete" and "Mark In Progress" buttons to change the status of a task.
 8. Use the "Delete Selected" button to delete selected tasks.
 
@@ -28,7 +28,7 @@ This Task Manager application allows users to manage their tasks by entering tas
 - Add tasks with deadline dates and times.
 - Mark tasks as complete or in progress.
 - Delete tasks.
-- Prioritize tasks by right-clicking and selecting the "Prioritize Task" option.
+- Prioritise tasks by right-clicking and selecting the "Prioritise Task" option.
 
 ## Notes
 - Tasks are stored in memory and are not persisted between sessions.
