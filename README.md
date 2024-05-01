@@ -30,7 +30,7 @@ This Task Manager application allows users to manage their tasks by entering tas
 - Prioritise tasks by right-clicking and selecting the "Prioritise Task" option.
 
 ## Notes
-- Tasks are stored in memory and are not persisted between sessions.
+- I recommend a unique username on login.
 - The application uses a graphical user interface (GUI) built with Tkinter.
 
 ## Author
