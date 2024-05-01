@@ -4,13 +4,11 @@
 This Task Manager application allows users to manage their tasks by entering task details such as task name, deadline date and time, and status. Users can add tasks, mark them as complete or in progress, delete tasks, and prioritise them.
 
 ## Requirements
-- Python 3.x
-- Tkinter (standard GUI library for Python)
+- Python 3.11.x 
 - tkcalendar (a calendar widget for Tkinter)
-- datetime (for working with dates and times)
 
 ## Installation
-1. Ensure you have Python 3.x installed on your system.
+1. Ensure you have Python 3.11.x installed on your system.
 2. Install Tkinter if not already installed. It is usually included with Python distributions.
 3. Install tkcalendar by running `pip install tkcalendar` in your terminal.
 
