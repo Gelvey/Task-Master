@@ -1,4 +1,4 @@
-# Task Master
+# Task-Master
 
 ## Overview
 This Task Manager application allows users to manage their tasks by entering task details such as task name, deadline date and time, and status. Users can add tasks, mark them as complete or in progress, delete tasks, and prioritise them.
