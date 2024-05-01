@@ -9,7 +9,6 @@ This Task Manager application allows users to manage their tasks by entering tas
 
 ## Installation
 1. Ensure you have Python 3.11.x installed on your system.
-2. Install Tkinter if not already installed. It is usually included with Python distributions.
 3. Install tkcalendar by running `pip install tkcalendar` in your terminal.
 
 ## Usage
