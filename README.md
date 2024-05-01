@@ -9,7 +9,8 @@ This Task Manager application allows users to manage their tasks by entering tas
 
 ## Installation
 1. Ensure you have Python 3.11.x installed on your system.
-3. Install tkcalendar by running `pip install tkcalendar` in your terminal.
+2. Install tkcalendar by running `pip install tkcalendar` in your terminal.
+3. Create a Firebase Realtime Database.
 
 ## Usage
 1. Run the `task_manager.py` script using Python.
@@ -22,6 +23,7 @@ This Task Manager application allows users to manage their tasks by entering tas
 8. Use the "Delete Selected" button to delete selected tasks.
 
 ## Features
+- Utilises Firebase Realtime Database
 - Add tasks with deadline dates and times.
 - Mark tasks as complete or in progress.
 - Delete tasks.
