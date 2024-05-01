@@ -32,4 +32,4 @@ This Task Manager application allows users to manage their tasks by entering tas
 - The application uses a graphical user interface (GUI) built with Tkinter.
 
 ## Author
-Circuit
+Circuit & Gelvey
