@@ -9,7 +9,7 @@ Task-Master is a desktop application built with Python and Tkinter GUI toolkit. 
 - **Task Treeview**: All tasks are displayed in a treeview with columns for Task, Deadline, and Status.
 - **Task Status Manipulation**: Users can mark tasks as complete, in progress, or to-do using dedicated buttons.
 - **Task Deletion**: Users can delete selected tasks from the treeview.
-- **Task Prioritisation**: Users can prioritize a task by right-clicking on it and selecting the "Prioritize Task" option, which moves the task to the top of the list.
+- **Task Prioritisation**: Users can prioritise a task by right-clicking on it and selecting the "Prioritize Task" option, which moves the task to the top of the list.
 - **Database Integration**: Task data is stored in a Firebase Realtime Database, allowing users to access their tasks from multiple devices.
 - **Logging**: Application activity is logged to a file named `task_manager.log`.
 - **Tooltips**: Tooltips are provided for input fields to guide users on their usage.
