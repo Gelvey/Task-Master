@@ -8,13 +8,13 @@ from firebase_admin import credentials, db
 import configparser
 
 # Initialize Firebase app with credentials
-cred = credentials.Certificate('Path/To/ServiceAccountKey.json')
+cred = credentials.Certificate('credentials.json')
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://your-project-id.firebasedatabase.app/'
+    'databaseURL': 'https://login-2-600a7-default-rtdb.asia-southeast1.firebasedatabase.app/'
 })
 
 # Configure logging
-logging.basicConfig(filename='task_manager.log', level=logging.INFO)
+logging.basicConfig(filename='Task-Msaster.log', level=logging.INFO)
 
 def read_username_from_config():
     config = configparser.ConfigParser()
