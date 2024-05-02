@@ -440,7 +440,7 @@ class ToolTip:
             self.tooltip_window = tw = tk.Toplevel(self.widget)
             tw.wm_overrideredirect(True)
             tw.wm_geometry("+%d+%d" % (x, y))
-            label = tk.Label(tw, text=self.text, justify='left', bg='yellow', relief='solid', borderwidth=1,
+            label = tk.Label(tw, text=self.text, justify='left', bg='white', relief='solid', borderwidth=1,
                              font=("Helvetica", 10, "normal"))
             label.pack(ipadx=1)
 
