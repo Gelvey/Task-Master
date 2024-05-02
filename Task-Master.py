@@ -8,12 +8,16 @@ from firebase_admin import credentials, db
 import configparser
 import re
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
 
 # Initialize Firebase app with credentials
 cred = credentials.Certificate('credentials.json')
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://login-2-600a7-default-rtdb.asia-southeast1.firebasedatabase.app/'
+    'databaseURL': FIREBASE_DATABASE_URL
 })
 
 # Configure logging
