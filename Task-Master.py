@@ -6,6 +6,9 @@ import logging
 import firebase_admin
 from firebase_admin import credentials, db
 import configparser
+import re
+import os
+
 
 # Initialize Firebase app with credentials
 cred = credentials.Certificate('credentials.json')
@@ -14,35 +17,45 @@ firebase_admin.initialize_app(cred, {
 })
 
 # Configure logging
-logging.basicConfig(filename='Task-Msaster.log', level=logging.INFO)
+logging.basicConfig(filename='Task-Master.log', level=logging.INFO, filemode='a')  # Append to the log file
+
 
 def read_username_from_config():
     config = configparser.ConfigParser()
-    config.read('config.ini')
-    try:
-        username = config.get('user', 'username')
-        return username
-    except configparser.Error:
+    config_file = 'config.ini'
+    if os.path.isfile(config_file):
+        config.read(config_file)
+        try:
+            username = config.get('user', 'username')
+            return username
+        except configparser.Error:
+            return ''
+    else:
         return ''
+
 
 def write_username_to_config(username):
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config_file = 'config.ini'
+    config.read(config_file)
 
     # Create the [user] section if it doesn't exist
     if not config.has_section('user'):
         config.add_section('user')
 
     config.set('user', 'username', username)
-    with open('config.ini', 'w') as config_file:
-        config.write(config_file)
+    with open(config_file, 'w') as file:
+        config.write(file)
+
 
 class Task:
-    def __init__(self, name, deadline, status):
+    def __init__(self, name, deadline, status, order=0):
         self.name = name
         self.deadline = deadline
         self.status = status
-        
+        self.order = order
+
+
 class LoginScreen(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -66,7 +79,7 @@ class LoginScreen(tk.Tk):
         self.login_button.pack(pady=10)
 
     def login(self):
-        username = self.username_entry.get()
+        username = self.username_entry.get().strip()  # Remove leading/trailing whitespaces
         if username:
             write_username_to_config(username)
             self.open_task_manager()
@@ -78,6 +91,7 @@ class LoginScreen(tk.Tk):
         root = tk.Tk()
         app = TaskManager(root, self.username)
         root.mainloop()
+
 
 class TaskManager:
     def __init__(self, master, username):
@@ -93,7 +107,7 @@ class TaskManager:
         main_frame.grid(row=0, column=0, sticky="nsew")
 
         # Create task entry widgets
-        task_frame = ttk.LabelFrame(main_frame, text="Add Task")
+        task_frame = ttk.LabelFrame(main_frame, text="Add/Edit Task")
         task_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 
         self.task_label = ttk.Label(task_frame, text="Task:")
@@ -114,16 +128,19 @@ class TaskManager:
 
         self.deadline_entry_time = ttk.Combobox(task_frame, width=10)
         self.deadline_entry_time.grid(row=0, column=5, padx=5, pady=5)
-        self.populate_time_combobox()  # Populate time combobox with future times
+        self.populate_time_combobox()
 
         self.status_label = ttk.Label(task_frame, text="Status:")
         self.status_label.grid(row=0, column=6, padx=5, pady=5, sticky="w")
 
-        self.status_combobox = ttk.Combobox(task_frame, values=["To Do", "In Progress", "Complete"])
+        self.status_combobox = ttk.Combobox(task_frame, values=["To Do", "In Progress"])
         self.status_combobox.grid(row=0, column=7, padx=5, pady=5)
 
         self.add_button = ttk.Button(task_frame, text="Add Task", command=self.add_task)
         self.add_button.grid(row=0, column=8, padx=5, pady=5)
+
+        self.edit_button = ttk.Button(task_frame, text="Edit Task", command=self.edit_task)
+        self.edit_button.grid(row=0, column=9, padx=5, pady=5)
 
         # Create task treeview
         self.task_tree = ttk.Treeview(main_frame, columns=("Task", "Deadline", "Status"), show="headings")
@@ -161,6 +178,10 @@ class TaskManager:
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
 
+        # Make the window resizable
+        self.master.rowconfigure(0, weight=1)
+        self.master.columnconfigure(0, weight=1)
+
         # Load tasks into the treeview
         self.update_task_tree()
 
@@ -171,29 +192,91 @@ class TaskManager:
         widget.bind("<Leave>", lambda _: tooltip.hidetip())
 
     def populate_time_combobox(self):
-        current_time = datetime.now().replace(second=0, microsecond=0)
-        future_times = [current_time + timedelta(minutes=30 * i) for i in range(48)]  # Future times in half-hour intervals
-        time_strings = [time.strftime('%H:%M') for time in future_times if time > current_time]
+        # Define the static time strings in 30-minute intervals
+        time_strings = [
+            '00:00', '00:30', '01:00', '01:30', '02:00', '02:30', '03:00', '03:30',
+            '04:00', '04:30', '05:00', '05:30', '06:00', '06:30', '07:00', '07:30',
+            '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+            '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
+            '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+            '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', '23:00', '23:30', '24:00'
+        ]
         self.deadline_entry_time['values'] = time_strings
 
-    def add_task(self):
-        task_name = self.task_entry.get()
+
+    def validate_input(self):
+        task_name = self.task_entry.get().strip()
         deadline_date = self.deadline_entry_date.get()
         deadline_time = self.deadline_entry_time.get()
         status = self.status_combobox.get()
 
-        if task_name and deadline_date and deadline_time and status:
+        if not task_name:
+            messagebox.showerror("Error", "Please enter a task name.")
+            return False
+
+        if not deadline_date or not deadline_time:
+            messagebox.showerror("Error", "Please enter a deadline date and time.")
+            return False
+
+        if not status:
+            messagebox.showerror("Error", "Please select a status.")
+            return False
+
+        return True
+
+    def add_task(self):
+        if self.validate_input():
+            task_name = self.task_entry.get().strip()
+            deadline_date = self.deadline_entry_date.get()
+            deadline_time = self.deadline_entry_time.get()
+            status = self.status_combobox.get()
             deadline = f"{deadline_date} {deadline_time}"
             task = Task(task_name, deadline, status)
             self.tasks.append(task)
-            self.save_tasks_to_database()  # Save tasks to the database
+            try:
+                self.save_tasks_to_database()  # Save tasks to the database
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save tasks to the database: {e}")
             self.update_task_tree()
-            self.task_entry.delete(0, tk.END)
-            self.deadline_entry_date.delete(0, tk.END)
-            self.deadline_entry_time.delete(0, tk.END)
-            self.populate_time_combobox()  # Update time combobox with future times
+            self.clear_task_entry()
+
+    def edit_task(self):
+        selected_item = self.task_tree.selection()
+        if selected_item:
+            item = self.task_tree.item(selected_item)
+            task_name = item['values'][0]
+            deadline = item['values'][1]
+            status = item['values'][2]
+
+            # Find the task object
+            task = next((t for t in self.tasks if t.name == task_name and t.deadline == deadline and t.status == status), None)
+
+            if task:
+                self.task_entry.delete(0, tk.END)
+                self.task_entry.insert(0, task.name)
+                self.deadline_entry_date.set_date(datetime.strptime(task.deadline.split()[0], '%Y-%m-%d').date())
+                self.deadline_entry_time.set(task.deadline.split()[1])
+                self.status_combobox.set(task.status)
+
+                # Save the edited task details
+                def save_edited_task():
+                    if self.validate_input():
+                        task.name = self.task_entry.get().strip()
+                        task.deadline = f"{self.deadline_entry_date.get()} {self.deadline_entry_time.get()}"
+                        task.status = self.status_combobox.get()
+                        try:
+                            self.save_tasks_to_database()
+                        except Exception as e:
+                            messagebox.showerror("Error", f"Failed to save tasks to the database: {e}")
+                        self.update_task_tree()
+                        self.clear_task_entry()
+                        self.add_button.config(text="Add Task", command=self.add_task)  # Reset button text and command
+
+                self.add_button.config(text="Save Changes", command=save_edited_task)
+            else:
+                messagebox.showwarning("Warning", "Please select a task to edit.")
         else:
-            messagebox.showwarning("Warning", "Please enter task, deadline, and select status.")
+            messagebox.showwarning("Warning", "Please select a task to edit.")
 
     def mark_complete(self):
         selected_item = self.task_tree.selection()
@@ -275,10 +358,10 @@ class TaskManager:
         if item_id:
             # Create a right-click menu
             menu = tk.Menu(self.master, tearoff=0)
-            menu.add_command(label="Prioritize Task", command=lambda: self.prioritize_task(item_id))
+            menu.add_command(label="Prioritise Task", command=lambda: self.prioritise_task(item_id))
             menu.post(event.x_root, event.y_root)
 
-    def prioritize_task(self, item_id):
+    def prioritise_task(self, item_id):
         # Get the task details from the item ID
         task_details = self.task_tree.item(item_id)['values']
         task_name = task_details[0]
@@ -292,11 +375,17 @@ class TaskManager:
             # Remove the task from the list
             self.tasks.remove(task)
 
-            # Insert the task at the beginning of the list
+            # Insert the task at the beginning of the list and update the order values
+            task.order = 0
+            for i, t in enumerate(self.tasks):
+                t.order = i + 1
             self.tasks.insert(0, task)
 
             # Save updated tasks to the database
-            self.save_tasks_to_database()
+            try:
+                self.save_tasks_to_database()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save tasks to the database: {e}")
 
             # Update the task treeview
             self.update_task_tree()
@@ -312,18 +401,30 @@ class TaskManager:
                 name = task_data['name']
                 deadline = task_data['deadline']
                 status = task_data['status']
-                task = Task(name, deadline, status)
+                order = task_data.get('order', 0)  # Get the order value if it exists, default to 0
+                task = Task(name, deadline, status, order)
                 tasks.append(task)
 
+        tasks.sort(key=lambda x: x.order)  # Sort tasks based on order
         return tasks
 
     def save_tasks_to_database(self):
         # Save tasks to the user-specific directory
         tasks_ref = db.reference(f'users/{self.username}/tasks')
-        tasks_data = {task.name: {'name': task.name, 'deadline': task.deadline, 'status': task.status} for task in self.tasks}
-        tasks_ref.set(tasks_data)
+        tasks_data = {task.name: {'name': task.name, 'deadline': task.deadline, 'status': task.status, 'order': task.order} for task in self.tasks}
+        try:
+            tasks_ref.set(tasks_data)
+            logging.info(f"Tasks saved to the database for user {self.username}")
+        except Exception as e:
+            logging.error(f"Failed to save tasks to the database: {e}")
+            raise e
 
-        logging.info(f"Tasks saved to the database for user {self.username}")
+    def clear_task_entry(self):
+        self.task_entry.delete(0, tk.END)
+        self.deadline_entry_date.set_date(datetime.today())
+        self.deadline_entry_time.set('')
+        self.status_combobox.set('')
+
 
 class ToolTip:
     def __init__(self, widget, text):
@@ -339,7 +440,8 @@ class ToolTip:
             self.tooltip_window = tw = tk.Toplevel(self.widget)
             tw.wm_overrideredirect(True)
             tw.wm_geometry("+%d+%d" % (x, y))
-            label = tk.Label(tw, text=self.text, justify='left', bg='yellow', relief='solid', borderwidth=1, font=("Helvetica", 10, "normal"))
+            label = tk.Label(tw, text=self.text, justify='left', bg='yellow', relief='solid', borderwidth=1,
+                             font=("Helvetica", 10, "normal"))
             label.pack(ipadx=1)
 
     def hidetip(self):
@@ -347,9 +449,11 @@ class ToolTip:
             self.tooltip_window.destroy()
             self.tooltip_window = None
 
+
 def main():
     login_screen = LoginScreen()
     login_screen.mainloop()
+
 
 if __name__ == "__main__":
     main()
