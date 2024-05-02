@@ -8,9 +8,9 @@ from firebase_admin import credentials, db
 import configparser
 
 # Initialize Firebase app with credentials
-cred = credentials.Certificate('Path/To/ServiceAccountKey.json')
+cred = credentials.Certificate('credentials.json')
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://your-project-id.firebasedatabase.app/'
+    'databaseURL': 'https://login-2-600a7-default-rtdb.asia-southeast1.firebasedatabase.app/'
 })
 
 # Configure logging
@@ -46,7 +46,7 @@ class Task:
 class LoginScreen(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Task Manager - Login")
+        self.title("Task-Master - Login")
         self.geometry("300x150")
 
         self.username = read_username_from_config()
@@ -82,7 +82,7 @@ class LoginScreen(tk.Tk):
 class TaskManager:
     def __init__(self, master, username):
         self.master = master
-        self.master.title("Task Manager")
+        self.master.title("Task-Master")
         self.username = username
         self.tasks = self.load_tasks_from_database()
         self.setup_ui()
@@ -148,8 +148,11 @@ class TaskManager:
         self.in_progress_button = ttk.Button(button_frame, text="Mark In Progress", command=self.mark_in_progress)
         self.in_progress_button.grid(row=0, column=1, padx=5, pady=5)
 
+        self.to_do_button = ttk.Button(button_frame, text="Mark To Do", command=self.mark_to_do)
+        self.to_do_button.grid(row=0, column=2, padx=5, pady=5)
+
         self.delete_button = ttk.Button(button_frame, text="Delete Selected", command=self.delete_selected)
-        self.delete_button.grid(row=0, column=2, padx=5, pady=5)
+        self.delete_button.grid(row=0, column=3, padx=5, pady=5)
 
         # Bind right-click event to the task treeview
         self.task_tree.bind("<Button-3>", self.right_click_menu)
@@ -227,6 +230,24 @@ class TaskManager:
             self.update_task_tree()
         else:
             messagebox.showwarning("Warning", "Please select a task to mark in progress.")
+
+    def mark_to_do(self):
+        selected_item = self.task_tree.selection()
+        if selected_item:
+            item = self.task_tree.item(selected_item)
+            task_name = item['values'][0]
+            deadline = item['values'][1]
+
+            # Change status to "To Do"
+            for task in self.tasks:
+                if task.name == task_name and task.deadline == deadline:
+                    task.status = "To Do"
+                    break
+
+            self.save_tasks_to_database()  # Save updated tasks to the database
+            self.update_task_tree()
+        else:
+            messagebox.showwarning("Warning", "Please select a task to mark to do.")
 
     def delete_selected(self):
         selected_items = self.task_tree.selection()
