@@ -9,10 +9,12 @@ Task-Master is a desktop application built with Python and Tkinter GUI toolkit. 
 - **Task Treeview**: All tasks are displayed in a treeview with columns for Task, Deadline, and Status.
 - **Task Status Manipulation**: Users can mark tasks as complete, in progress, or to-do using dedicated buttons.
 - **Task Deletion**: Users can delete selected tasks from the treeview.
-- **Task Prioritisation**: Users can prioritise a task by right-clicking on it and selecting the "Prioritise Task" option, which moves the task to the top of the list.
-- **Database Integration**: Task data is stored in a Firebase Realtime Database, allowing users to access their tasks from multiple devices.
-- **Logging**: Application activity is logged to a file named `task_manager.log`.
-- **Tooltips**: Tooltips are provided for input fields to guide users on their usage.
+- **Task Prioritisation**: Task prioritisation is now stored in the cloud database, ensuring it saves over sessions and devices.
+- **Edit Existing Tasks**: Added support for editing existing tasks intuitively.
+- **Input Validation**: Input validation has been implemented to improve data integrity.
+- **Error Handling**: Implemented error handling for database operations to provide a smoother user experience.
+- **Improved User Interface**: Improving the user interface and user experience with features such as resizable window and better layout.
+- **Code Refactoring**: Refactored the code to follow best practices, including separating concerns and using functions/methods for better maintainability.
 
 ## Requirements
 
@@ -24,17 +26,17 @@ Task-Master is a desktop application built with Python and Tkinter GUI toolkit. 
 
 1. Ensure you have Python 3.11.x installed on your system.
 2. Install the required Python packages by running the following command: `pip install tkcalendar firebase_admin`
-4. Follow given instructions inside `credentials.json` file to setup the database.
+3. Follow the instructions inside `credentials.json` file to set up the database.
 
 ## Usage
 
 1. Run the `Task-Master.py` script using Python.
 2. If this is your first time using the application, enter a username in the provided field and click the "Login" button.
 3. The main window of the Task Manager application will appear.
-4. Enter the task details, including the task name, deadline date, deadline time, and status (To Do, In Progress, or Complete).
+4. Enter the task details, including the task name, deadline date, deadline time, and status (To Do or In Progress).
 5. Click on the "Add Task" button to add the task to the list.
 6. Tasks will be displayed in the treeview with columns for Task, Deadline, and Status.
-7. Right-click on a task to access the context menu with the option to prioritize the task.
+7. Right-click on a task to access the context menu with the option to prioritise the task.
 8. Use the "Mark Complete," "Mark In Progress," and "Mark To Do" buttons to change the status of a task.
 9. Use the "Delete Selected" button to delete selected tasks.
 
