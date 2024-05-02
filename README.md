@@ -24,8 +24,7 @@ Task-Master is a desktop application built with Python and Tkinter GUI toolkit. 
 
 1. Ensure you have Python 3.11.x installed on your system.
 2. Install the required Python packages by running the following command: `pip install tkcalendar firebase_admin`
-3. Create a Firebase Realtime Database project.
-4. Follow given instructions inside `credentials.json` file.
+4. Follow given instructions inside `credentials.json` file to setup the database.
 
 ## Usage
 
