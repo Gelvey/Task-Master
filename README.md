@@ -1,5 +1,7 @@
 # Task-Master
 
+**Written in Australian English.**
+
 Task-Master is a desktop application built with Python and Tkinter GUI toolkit. It allows users to manage their tasks efficiently by providing features like adding tasks with deadlines, marking tasks as complete, to do, or in progress, deleting tasks, and prioritizing important tasks.
 
 ## Features
