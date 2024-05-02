@@ -8,9 +8,9 @@ from firebase_admin import credentials, db
 import configparser
 
 # Initialize Firebase app with credentials
-cred = credentials.Certificate('credentials.json')
+cred = credentials.Certificate('Path/To/ServiceAccountKey.json')
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://login-2-600a7-default-rtdb.asia-southeast1.firebasedatabase.app/'
+    'databaseURL': 'https://your-project-id.firebasedatabase.app/'
 })
 
 # Configure logging
