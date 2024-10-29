@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 from datetime import datetime, timedelta
 import logging
+import time
 import firebase_admin
 from firebase_admin import credentials, db
 import configparser
@@ -722,83 +723,198 @@ class ToolTip:
             self.tooltip_window.destroy()
             self.tooltip_window = None
 
-    class TaskDescriptionWindow:
-        def __init__(self, master, task, save_callback, task_description):
-            """
-            Initialize the task description window.
+class TaskDescriptionWindow:
+    def __init__(self, master, task, save_callback, task_description):
+        """
+        Initialize the task description window.
+    
+        Args:
+            master: The parent window
+            task: The task object to edit
+            save_callback: Callback function to save changes to database
+            task_description: The current task description
+        """
+        self.window = tk.Toplevel(master)
+        self.window.title("Task Description")
+        self.window.geometry("400x400")
         
-            Args:
-                master: The parent window
-                task: The task object to edit
-                save_callback: Callback function to save changes to database
-                task_description: The current task description
-            """
-            self.window = tk.Toplevel(master)
-            self.window.title("Task Description")
-            self.window.geometry("400x300")
+        # Store original values for comparison
+        self.original_description = task_description or ""
+        self.original_url = getattr(task, 'url', "")
         
-            self.task = task
-            self.save_callback = save_callback
+        # Main container frame
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+        self.task = task
+        self.save_callback = save_callback
         
-            # Description frame
-            description_frame = ttk.LabelFrame(self.window, text="Description", padding=10)
-            description_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Add a status bar for feedback
+        self.status_var = tk.StringVar()
+        self.status_bar = ttk.Label(main_frame, textvariable=self.status_var)
+        self.status_bar.pack(fill=tk.X, side=tk.BOTTOM, padx=5)
+    
+        # Description frame
+        description_frame = ttk.LabelFrame(main_frame, text="Description", padding=10)
+        description_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+        # Description text area
+        self.description_text = tk.Text(description_frame, wrap=tk.WORD, height=10)
+        self.description_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+        # If there's an existing description, insert it
+        if task_description:
+            self.description_text.insert('1.0', task_description)
+    
+        # URL frame
+        url_frame = ttk.LabelFrame(main_frame, text="Related URL", padding=10)
+        url_frame.pack(fill=tk.X, padx=5, pady=5)
+    
+        # URL entry
+        self.url_entry = ttk.Entry(url_frame)
+        self.url_entry.pack(fill=tk.X, padx=5, pady=5)
+    
+        # If there's an existing URL in the task object, insert it
+        if hasattr(task, 'url'):
+            self.url_entry.insert(0, task.url)
+    
+        # Buttons frame
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=10, side=tk.BOTTOM)
+    
+        # Save button
+        self.save_button = ttk.Button(
+            button_frame, 
+            text="Save (Ctrl+S)", 
+            command=self.save_with_verification
+        )
+        self.save_button.pack(side=tk.RIGHT, padx=5)
+    
+        # Cancel button
+        self.cancel_button = ttk.Button(
+            button_frame, 
+            text="Cancel", 
+            command=self.confirm_close
+        )
+        self.cancel_button.pack(side=tk.RIGHT, padx=5)
+    
+        # Bind keyboard shortcuts
+        self.window.bind('<Control-s>', lambda e: self.save_with_verification())
+        self.window.bind('<Escape>', lambda e: self.confirm_close())
         
-            # Description text area
-            self.description_text = tk.Text(description_frame, wrap=tk.WORD, height=10)
-            self.description_text.pack(fill=tk.BOTH, expand=True)
+        # Bind window close event
+        self.window.protocol("WM_DELETE_WINDOW", self.confirm_close)
+    
+        # Center the window
+        self.window.update_idletasks()
+        width = self.window.winfo_width()
+        height = self.window.winfo_height()
+        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.window.winfo_screenheight() // 2) - (height // 2)
+        self.window.geometry(f'+{x}+{y}')
         
-            # If there's an existing description, insert it
-            if task_description:
-                self.description_text.insert('1.0', task_description)
+        # Set minimum window size
+        self.window.minsize(400, 300)
         
-            # URL frame
-            url_frame = ttk.LabelFrame(self.window, text="Related URL", padding=10)
-            url_frame.pack(fill=tk.X, padx=5, pady=5)
+        # Set focus to description text area
+        self.description_text.focus_set()
         
-            # URL entry
-            self.url_entry = ttk.Entry(url_frame)
-            self.url_entry.pack(fill=tk.X)
+        # Flag to track save status
+        self.changes_saved = True
         
-            # If there's an existing URL in the task object, insert it
-            if hasattr(task, 'url'):
-                self.url_entry.insert(0, task.url)
-        
-            # Buttons frame
-            button_frame = ttk.Frame(self.window)
-            button_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-            # Save button
-            save_button = ttk.Button(button_frame, text="Save", command=self.save)
-            save_button.pack(side=tk.RIGHT, padx=5)
-        
-            # Cancel button
-            cancel_button = ttk.Button(button_frame, text="Cancel", command=self.window.destroy)
-            cancel_button.pack(side=tk.RIGHT, padx=5)
-        
-            # Center the window
-            self.window.update_idletasks()
-            width = self.window.winfo_width()
-            height = self.window.winfo_height()
-            x = (self.window.winfo_screenwidth() // 2) - (width // 2)
-            y = (self.window.winfo_screenheight() // 2) - (height // 2)
-            self.window.geometry(f'+{x}+{y}')
+        # Bind text changes to track modifications
+        self.description_text.bind('<<Modified>>', self.on_modify)
+        self.url_entry.bind('<Key>', self.on_modify)
 
-        def save(self):
-            """Save the description and URL to the task object and trigger the save callback"""
+    def on_modify(self, event=None):
+        """Track when changes are made to the form"""
+        self.changes_saved = False
+        self.status_var.set("Unsaved changes")
+        
+    def has_changes(self):
+        """Check if there are unsaved changes"""
+        current_description = self.description_text.get('1.0', 'end-1c')
+        current_url = self.url_entry.get().strip()
+        return (current_description != self.original_description or 
+                current_url != self.original_url)
+
+    def confirm_close(self):
+        """Confirm before closing if there are unsaved changes"""
+        if not self.changes_saved and self.has_changes():
+            if messagebox.askyesno("Unsaved Changes", 
+                                 "You have unsaved changes. Do you want to save before closing?"):
+                self.save_with_verification()
+            elif messagebox.askyesno("Confirm Close", 
+                                   "Are you sure you want to close without saving?"):
+                self.window.destroy()
+        else:
+            self.window.destroy()
+
+    def save_with_verification(self):
+        """Save with verification and retry logic"""
+        if not self.has_changes():
+            self.status_var.set("No changes to save")
+            return
+            
+        self.status_var.set("Saving...")
+        self.save_button.config(state='disabled')
+        
+        try:
+            # Get the current values
             description = self.description_text.get('1.0', 'end-1c')
             url = self.url_entry.get().strip()
-        
+            
+            # Validate URL format if one is provided
+            if url and not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            
             # Update the task object
             self.task.description = description
             self.task.url = url
-        
-            # Call the save callback to update the database
-            self.save_callback()
-        
-            # Close the window
+            
+            # Attempt to save with retry logic
+            max_retries = 3
+            retry_count = 0
+            save_successful = False
+            
+            while not save_successful and retry_count < max_retries:
+                try:
+                    self.save_callback()
+                    save_successful = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        self.status_var.set(f"Retry attempt {retry_count}...")
+                        time.sleep(1)  # Wait before retrying
+                    else:
+                        raise e
+            
+            # Update status and enable save button
+            self.status_var.set("Changes saved successfully")
+            self.changes_saved = True
+            
+            # Update original values
+            self.original_description = description
+            self.original_url = url
+            
+            # Log successful save
+            logging.info(f"Task description saved successfully for task: {self.task.name}")
+            
+            # Show success message and destroy window
+            messagebox.showinfo("Success", "Task details saved successfully!")
+            
+            # Re-enable the save button before destroying the window
+            self.save_button.config(state='normal')
+            
+            # Destroy the window
             self.window.destroy()
-
+            
+        except Exception as e:
+            error_msg = f"Failed to save task details: {str(e)}"
+            self.status_var.set("Error saving changes")
+            logging.error(error_msg)
+            messagebox.showerror("Error", error_msg)
+            self.save_button.config(state='normal')
 
 def main():
     login_screen = LoginScreen()
