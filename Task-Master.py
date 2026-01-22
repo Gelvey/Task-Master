@@ -144,13 +144,13 @@ class TaskManager:
         self.username = username
 
         # Define colour options before loading tasks
+        # Priority options (internal name "colour" retained for minimal changes)
         self.colour_options = {
             "default": {"bg": "white", "fg": "black"},
             "Important": {"bg": "#ffcdd2", "fg": "black"},  # Light red
             "Moderately Important": {"bg": "#fff9c4", "fg": "black"},  # Light yellow
             "Not Important": {"bg": "#c8e6c9", "fg": "black"},  # Light green
-            "Personal": {"bg": "#e1bee7", "fg": "black"},  # Light purple
-            "Work": {"bg": "#bbdefb", "fg": "black"},  # Light blue
+            # removed Personal & Work as requested
         }
 
         # Drag-and-drop tracking data (Treeview created in UI setup)
@@ -266,14 +266,14 @@ class TaskManager:
         tasks.sort(key=lambda x: x.order)
         return tasks
 
-    def save_tasks_to_database(self):
+    def save_tasks_to_database(self, task_to_update=None):
         """
-        Save tasks to Firebase database with all necessary fields
+        Save tasks to Firebase or local JSON. If task_to_update is provided, update only that task's entry.
+        This ensures the URL/description saved from the description window is persisted immediately.
         """
-        tasks_data = {}
 
-        for task in self.tasks:
-            task_data = {
+        def make_task_data(task):
+            return {
                 "name": task.name,
                 "deadline": task.deadline if hasattr(task, "deadline") else None,
                 "status": task.status if hasattr(task, "status") else "To Do",
@@ -282,7 +282,38 @@ class TaskManager:
                 "url": getattr(task, "url", ""),
                 "colour": getattr(task, "colour", "default"),
             }
-            tasks_data[task.name] = task_data
+
+        if task_to_update is not None:
+            # Update single task entry
+            task_data = make_task_data(task_to_update)
+            if USE_FIREBASE:
+                try:
+                    task_ref = db.reference(f"users/{self.username}/tasks/{task_to_update.name}")
+                    task_ref.update(task_data)
+                    logging.info(f"Updated task '{task_to_update.name}' in Firebase for user {self.username}")
+                except Exception as e:
+                    logging.error(f"Failed to update task in Firebase: {e}")
+                    raise
+            else:
+                local_file = f"tasks_{self.username}.json"
+                try:
+                    tasks_data = {}
+                    if os.path.isfile(local_file):
+                        with open(local_file, "r", encoding="utf-8") as f:
+                            tasks_data = json.load(f) or {}
+                    tasks_data[task_to_update.name] = task_data
+                    with open(local_file, "w", encoding="utf-8") as f:
+                        json.dump(tasks_data, f, indent=2)
+                    logging.info(f"Updated task '{task_to_update.name}' locally for user {self.username} to {local_file}")
+                except Exception as e:
+                    logging.error(f"Failed to update local tasks file: {e}")
+                    raise
+            return
+
+        # Otherwise save full list (existing behavior)
+        tasks_data = {}
+        for task in self.tasks:
+            tasks_data[task.name] = make_task_data(task)
 
         if USE_FIREBASE:
             try:
@@ -504,6 +535,11 @@ class TaskManager:
         main_frame.grid(row=0, column=0, sticky="nsew")
         main_frame.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(1, weight=1)
+        # allow master window to be reasonably resizable
+        try:
+            self.master.minsize(700, 400)
+        except Exception:
+            pass
 
         # Create task entry widgets
         task_frame = ttk.LabelFrame(main_frame, text="Add/Edit Task")
@@ -538,8 +574,8 @@ class TaskManager:
         self.deadline_entry_time = ttk.Combobox(self.deadline_frame, width=10)
         self.populate_time_combobox()
 
-        # Colour selection
-        self.colour_label = ttk.Label(task_frame, text="Colour:")
+        # Priority selection (label changed from "Colour" to "Priority")
+        self.colour_label = ttk.Label(task_frame, text="Priority:")
         self.colour_label.grid(row=0, column=5, padx=5, pady=5, sticky="w")
         self.colour_combobox = ttk.Combobox(
             task_frame, values=list(self.colour_options.keys())
@@ -572,17 +608,23 @@ class TaskManager:
         )
         self.refresh_button.pack(side=tk.LEFT, padx=2)
 
-        # Create task treeview
+        # Create task treeview (column "Colour" renamed to "Priority" for UI)
         self.task_tree = ttk.Treeview(
             main_frame,
-            columns=("Task", "Deadline", "Status", "Colour"),
+            columns=("Task", "Deadline", "Status", "Priority"),
             show="headings",
         )
         self.task_tree.heading("Task", text="Task")
         self.task_tree.heading("Deadline", text="Deadline")
         self.task_tree.heading("Status", text="Status")
-        self.task_tree.heading("Colour", text="Colour")
+        self.task_tree.heading("Priority", text="Priority")
         self.task_tree.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+
+        # Configure column widths and stretching for better resizing behavior
+        self.task_tree.column("Task", anchor="w", width=300, stretch=True)
+        self.task_tree.column("Deadline", anchor="center", width=160, stretch=True)
+        self.task_tree.column("Status", anchor="center", width=120, stretch=False)
+        self.task_tree.column("Priority", anchor="center", width=120, stretch=False)
 
         # Configure tag colours for the treeview
         for colour_name, colour_values in self.colour_options.items():
@@ -677,10 +719,11 @@ class TaskManager:
                 self.open_description_window(task)
 
     def open_description_window(self, task):
+        # Pass a per-task save callback so updates to the URL/description are guaranteed persisted
         description_window = TaskDescriptionWindow(
             self.master,
             task,
-            self.save_tasks_to_database,
+            lambda: self.save_tasks_to_database(task),
             getattr(task, "description", ""),
         )
 
