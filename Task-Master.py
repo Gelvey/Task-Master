@@ -722,52 +722,12 @@ class TaskManager:
             self.deadline_entry_time.grid_remove()
             self.deadline_frame.grid_remove()
 
-        # Force complete geometry recalculation
+        # Refresh layout and recompute Treeview column widths without forcing window geometry/minsize.
         self.master.update_idletasks()
-
-        # Get current window position
-        x = self.master.winfo_x()
-        y = self.master.winfo_y()
-
-        # Temporarily set minimum size to 1x1 to allow full shrinking
-        self.master.minsize(1, 1)
-
-        # Force window to resize to fit content
-        self.master.grid_propagate(True)
-        self.master.pack_propagate(True)
-
-        # Update all geometry managers
-        for widget in self.master.winfo_children():
-            widget.update_idletasks()
-
-        # Get the actual required size
-        required_width = self.master.winfo_reqwidth()
-        required_height = self.master.winfo_reqheight()
-
-        # Set the window size and position
-        self.master.geometry(f"{required_width}x{required_height}+{x}+{y}")
-
-        # Reset minimum size constraints
-        self.master.update_idletasks()
-        self.master.minsize(required_width, required_height)
-
-        def update_window_size(self):
-            # Force geometry update
-            self.master.update_idletasks()
-            # Get the required size for all widgets
-            min_width = self.master.winfo_reqwidth()
-            min_height = self.master.winfo_reqheight()
-
-            # Get current window size
-            current_width = self.master.winfo_width()
-            current_height = self.master.winfo_height()
-
-            # Only shrink if needed, don't expand
-            new_width = min(current_width, min_width)
-            new_height = min(current_height, min_height)
-
-            # Update window size
-            self.master.geometry(f"{new_width}x{new_height}")
+        try:
+            self._resize_columns()
+        except Exception:
+            pass
 
     def show_task_details(self, event):
         item_id = self.task_tree.identify_row(event.y)
