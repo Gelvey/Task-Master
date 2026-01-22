@@ -6,6 +6,7 @@ import logging
 import time
 import firebase_admin
 from firebase_admin import credentials, db
+import json
 import configparser
 import re
 import os
@@ -13,14 +14,24 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
-
-# Initialize Firebase app with credentials
-cred = credentials.Certificate("credentials.json")
-firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
-
-# Configure logging
+# Configure logging early so initialization messages are recorded
 logging.basicConfig(filename="Task-Master.log", level=logging.INFO, filemode="a")
+
+# Firebase configuration with local fallback
+FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
+USE_FIREBASE = False
+try:
+    cred_path = "credentials.json"
+    if FIREBASE_DATABASE_URL and os.path.isfile(cred_path):
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
+        USE_FIREBASE = True
+        logging.info("Initialized Firebase backend")
+    else:
+        logging.warning("Firebase not configured or credentials.json missing; using local storage.")
+except Exception as e:
+    logging.error(f"Failed to initialize Firebase: {e}")
+    USE_FIREBASE = False
 
 
 def read_username_from_config():
@@ -142,18 +153,7 @@ class TaskManager:
             "Work": {"bg": "#bbdefb", "fg": "black"},  # Light blue
         }
 
-        # Initialize the Treeview widget for task display
-        self.task_tree = ttk.Treeview(
-            self.master
-        )  # Or `self` depending on the intended parent widget
-
-        # Configure drag and drop
-        self.task_tree.configure(selectmode="browse")
-        self.task_tree.bind("<Button-1>", self.on_click)
-        self.task_tree.bind("<B1-Motion>", self.on_drag)
-        self.task_tree.bind("<ButtonRelease-1>", self.on_drop)
-        self.task_tree.bind("<Button-3>", self.show_context_menu)
-
+        # Drag-and-drop tracking data (Treeview created in UI setup)
         self.drag_data = {"item": None, "initial_index": None}
 
         self.tasks = self.load_tasks_from_database()
@@ -228,13 +228,29 @@ class TaskManager:
         """
         Load tasks from Firebase database with proper error handling for missing fields
         """
-        tasks_ref = db.reference(f"users/{self.username}/tasks")
-        tasks_data = tasks_ref.get()
-
         tasks = []
+        tasks_data = None
+
+        if USE_FIREBASE:
+            try:
+                tasks_ref = db.reference(f"users/{self.username}/tasks")
+                tasks_data = tasks_ref.get()
+            except Exception as e:
+                logging.error(f"Failed to load tasks from Firebase: {e}")
+                tasks_data = None
+        else:
+            # Local JSON fallback
+            local_file = f"tasks_{self.username}.json"
+            if os.path.isfile(local_file):
+                try:
+                    with open(local_file, "r", encoding="utf-8") as f:
+                        tasks_data = json.load(f)
+                except Exception as e:
+                    logging.error(f"Failed to read local tasks file: {e}")
+                    tasks_data = None
+
         if tasks_data:
             for task_id, task_data in tasks_data.items():
-                # Use get() method with default values for all fields
                 task = Task(
                     name=task_data.get("name", "Untitled Task"),
                     deadline=task_data.get("deadline", None),
@@ -254,7 +270,6 @@ class TaskManager:
         """
         Save tasks to Firebase database with all necessary fields
         """
-        tasks_ref = db.reference(f"users/{self.username}/tasks")
         tasks_data = {}
 
         for task in self.tasks:
@@ -269,12 +284,24 @@ class TaskManager:
             }
             tasks_data[task.name] = task_data
 
-        try:
-            tasks_ref.set(tasks_data)
-            logging.info(f"Tasks saved to the database for user {self.username}")
-        except Exception as e:
-            logging.error(f"Failed to save tasks to the database: {e}")
-            raise e
+        if USE_FIREBASE:
+            try:
+                tasks_ref = db.reference(f"users/{self.username}/tasks")
+                tasks_ref.set(tasks_data)
+                logging.info(f"Tasks saved to Firebase for user {self.username}")
+            except Exception as e:
+                logging.error(f"Failed to save tasks to Firebase: {e}")
+                raise
+        else:
+            # Write to local JSON file as fallback
+            local_file = f"tasks_{self.username}.json"
+            try:
+                with open(local_file, "w", encoding="utf-8") as f:
+                    json.dump(tasks_data, f, indent=2)
+                logging.info(f"Tasks saved locally for user {self.username} to {local_file}")
+            except Exception as e:
+                logging.error(f"Failed to save local tasks file: {e}")
+                raise
 
     def clear_task_entry(self):
         self.task_entry.delete(0, tk.END)
@@ -572,8 +599,12 @@ class TaskManager:
         scrollbar.grid(row=1, column=1, sticky="ns")
         self.task_tree.configure(yscrollcommand=scrollbar.set)
 
-        # Bind right-click event
-        self.task_tree.bind("<Button-3>", self.show_task_details)
+        # Configure selection and bind drag/drop + right-click context menu
+        self.task_tree.configure(selectmode="browse")
+        self.task_tree.bind("<Button-1>", self.on_click)
+        self.task_tree.bind("<B1-Motion>", self.on_drag)
+        self.task_tree.bind("<ButtonRelease-1>", self.on_drop)
+        self.task_tree.bind("<Button-3>", self.show_context_menu)
 
         self.toggle_deadline_entries()  # Initialize deadline entries state
         self.update_task_tree()
@@ -699,231 +730,7 @@ class TaskManager:
             self.task_tree.item(item, tags=(task.colour,))
 
 
-class TaskDescriptionWindow:
-    def __init__(self, master, task, save_callback, task_description):
-        self.window = tk.Toplevel(master)
-        self.window.title(f"Task Details: {task.name}")
-        self.window.geometry("400x300")
 
-        self.task = task
-        self.save_callback = save_callback
-
-        # URL frame
-        url_frame = ttk.LabelFrame(self.window, text="Related URL", padding=10)
-        url_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        self.url_entry = ttk.Entry(url_frame)
-        self.url_entry.pack(fill=tk.X)
-        if hasattr(task, "url"):
-            self.url_entry.insert(0, task.url)
-
-        # Description frame
-        desc_frame = ttk.LabelFrame(self.window, text="Description", padding=10)
-        desc_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        self.description_text = tk.Text(desc_frame, wrap=tk.WORD, height=10)
-        self.description_text.pack(fill=tk.BOTH, expand=True)
-        if task_description:
-            self.description_text.insert("1.0", task_description)
-
-        # Buttons
-        button_frame = ttk.Frame(self.window)
-        button_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Button(button_frame, text="Save", command=self.save).pack(
-            side=tk.RIGHT, padx=5
-        )
-        ttk.Button(button_frame, text="Cancel", command=self.window.destroy).pack(
-            side=tk.RIGHT, padx=5
-        )
-
-        if task.url:
-            ttk.Button(button_frame, text="Open URL", command=self.open_url).pack(
-                side=tk.LEFT, padx=5
-            )
-
-    def save(self):
-        self.task.description = self.description_text.get("1.0", "end-1c")
-        self.task.url = self.url_entry.get().strip()
-        self.save_callback()
-        self.window.destroy()
-
-    def open_url(self):
-        import webbrowser
-
-        if self.task.url:
-            webbrowser.open(self.task.url)
-
-    def create_tooltip(self, widget, text):
-        """Create a tooltip for a widget"""
-        tooltip = ToolTip(widget, text)
-        widget.bind("<Enter>", lambda _: tooltip.showtip())
-        widget.bind("<Leave>", lambda _: tooltip.hidetip())
-
-    def validate_input(self):
-        task_name = self.task_entry.get().strip()
-        deadline_date = self.deadline_entry_date.get()
-        deadline_time = self.deadline_entry_time.get()
-        status = self.status_combobox.get()
-
-        if not task_name:
-            messagebox.showerror("Error", "Please enter a task name.")
-            return False
-
-        if not deadline_date or not deadline_time:
-            messagebox.showerror("Error", "Please enter a deadline date and time.")
-            return False
-
-        if not status:
-            messagebox.showerror("Error", "Please select a status.")
-            return False
-
-        return True
-
-    def add_task(self):
-        if self.validate_input():
-            task_name = self.task_entry.get().strip()
-            deadline_date = self.deadline_entry_date.get()
-            deadline_time = self.deadline_entry_time.get()
-            status = self.status_combobox.get()
-            deadline = f"{deadline_date} {deadline_time}"
-            task = Task(task_name, deadline, status)
-            self.tasks.append(task)
-            try:
-                self.save_tasks_to_database()  # Save tasks to the database
-            except Exception as e:
-                messagebox.showerror(
-                    "Error", f"Failed to save tasks to the database: {e}"
-                )
-            self.update_task_tree()
-            self.clear_task_entry()
-
-    def mark_complete(self):
-        selected_item = self.task_tree.selection()
-        if selected_item:
-            item = self.task_tree.item(selected_item)
-            task_name = item["values"][0]
-            deadline = item["values"][1]
-
-            # Change status to "Complete"
-            for task in self.tasks:
-                if task.name == task_name and task.deadline == deadline:
-                    task.status = "Complete"
-                    break
-
-            self.save_tasks_to_database()  # Save updated tasks to the database
-            self.update_task_tree()
-        else:
-            messagebox.showwarning("Warning", "Please select a task to mark complete.")
-
-    def mark_in_progress(self):
-        selected_item = self.task_tree.selection()
-        if selected_item:
-            item = self.task_tree.item(selected_item)
-            task_name = item["values"][0]
-            deadline = item["values"][1]
-
-            # Change status to "In Progress"
-            for task in self.tasks:
-                if task.name == task_name and task.deadline == deadline:
-                    task.status = "In Progress"
-                    break
-
-            self.save_tasks_to_database()  # Save updated tasks to the database
-            self.update_task_tree()
-        else:
-            messagebox.showwarning(
-                "Warning", "Please select a task to mark in progress."
-            )
-
-    def mark_to_do(self):
-        selected_item = self.task_tree.selection()
-        if selected_item:
-            item = self.task_tree.item(selected_item)
-            task_name = item["values"][0]
-            deadline = item["values"][1]
-
-            # Change status to "To Do"
-            for task in self.tasks:
-                if task.name == task_name and task.deadline == deadline:
-                    task.status = "To Do"
-                    break
-
-            self.save_tasks_to_database()  # Save updated tasks to the database
-            self.update_task_tree()
-        else:
-            messagebox.showwarning("Warning", "Please select a task to mark to do.")
-
-    def delete_selected(self):
-        selected_items = self.task_tree.selection()
-        if selected_items:
-            for item in selected_items:
-                task_name = self.task_tree.item(item)["values"][0]
-                deadline = self.task_tree.item(item)["values"][1]
-                for task in self.tasks:
-                    if task.name == task_name and task.deadline == deadline:
-                        self.tasks.remove(task)
-                        break
-            self.save_tasks_to_database()  # Save updated tasks to the database
-            self.update_task_tree()
-        else:
-            messagebox.showwarning("Warning", "Please select tasks to delete.")
-
-    def update_task_tree(self):
-        self.task_tree.delete(*self.task_tree.get_children())
-        for task in self.tasks:
-            self.task_tree.insert(
-                "", tk.END, values=(task.name, task.deadline, task.status)
-            )
-
-    def right_click_menu(self, event):
-        # Select the item under the cursor
-        item_id = self.task_tree.identify_row(event.y)
-        if item_id:
-            # Create a right-click menu
-            menu = tk.Menu(self.master, tearoff=0)
-            menu.add_command(
-                label="Prioritise Task", command=lambda: self.prioritise_task(item_id)
-            )
-            menu.post(event.x_root, event.y_root)
-
-    def prioritise_task(self, item_id):
-        # Get the task details from the item ID
-        task_details = self.task_tree.item(item_id)["values"]
-        task_name = task_details[0]
-        deadline = task_details[1]
-        status = task_details[2]
-
-        # Find the task object
-        task = next(
-            (
-                t
-                for t in self.tasks
-                if t.name == task_name and t.deadline == deadline and t.status == status
-            ),
-            None,
-        )
-
-        if task:
-            # Remove the task from the list
-            self.tasks.remove(task)
-
-            # Insert the task at the beginning of the list and update the order values
-            task.order = 0
-            for i, t in enumerate(self.tasks):
-                t.order = i + 1
-            self.tasks.insert(0, task)
-
-            # Save updated tasks to the database
-            try:
-                self.save_tasks_to_database()
-            except Exception as e:
-                messagebox.showerror(
-                    "Error", f"Failed to save tasks to the database: {e}"
-                )
-
-            # Update the task treeview
-            self.update_task_tree()
 
 
 class ToolTip:

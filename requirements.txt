@@ -1,0 +1,6 @@
+firebase-admin
+tkcalendar
+python-dotenv
+# Dev/test utilities (optional)
+pytest
+flake8
