@@ -795,16 +795,29 @@ class TaskManager:
 
     def refresh_tasks(self):
         """Refresh tasks from the database"""
-        current_selection = self.task_tree.selection()
+        # Preserve selected task names (IDs change after repopulating)
+        try:
+            selected_items = self.task_tree.selection()
+            selected_names = []
+            for iid in selected_items:
+                vals = self.task_tree.item(iid).get("values") or []
+                if vals:
+                    selected_names.append(vals[0])
+        except Exception:
+            selected_names = []
+
         self.tasks = self.load_tasks_from_database()
         self.update_task_tree()
 
-        # Restore selection if possible
-        for item_id in current_selection:
-            try:
-                self.task_tree.selection_add(item_id)
-            except:
-                pass
+        # Restore selection by matching task names and ensure visible
+        try:
+            for child in self.task_tree.get_children():
+                vals = self.task_tree.item(child).get("values") or []
+                if vals and vals[0] in selected_names:
+                    self.task_tree.selection_add(child)
+                    self.task_tree.see(child)
+        except Exception:
+            pass
 
     def validate_input(self):
         task_name = self.task_entry.get().strip()
@@ -846,7 +859,8 @@ class TaskManager:
             deadline_w = int(total * 0.22)
             status_w = int(total * 0.12)
             owner_w = int(total * 0.12)
-            priority_w = max(int(total - (task_w + deadline_w + status_w + owner_w)), 100)
+            # increase minimum for Priority so long labels are not truncated
+            priority_w = max(int(total - (task_w + deadline_w + status_w + owner_w)), 180)
             self.task_tree.column("Task", width=task_w)
             self.task_tree.column("Deadline", width=deadline_w)
             self.task_tree.column("Status", width=status_w)
