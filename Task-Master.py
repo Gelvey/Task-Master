@@ -14,6 +14,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Parse owners from environment variable OWNERS (space-separated), optional
+OWNERS = os.getenv("OWNERS", "").split()
+
 # Configure logging early so initialization messages are recorded
 logging.basicConfig(filename="Task-Master.log", level=logging.INFO, filemode="a")
 
@@ -87,6 +90,7 @@ class Task:
         order=0,
         description="",
         url="",
+        owner="",
         colour="default",
     ):
         self.name = name
@@ -95,6 +99,7 @@ class Task:
         self.order = order
         self.description = description
         self.url = url
+        self.owner = owner
         self.colour = colour
 
 
@@ -252,12 +257,13 @@ class TaskManager:
         if tasks_data:
             for task_id, task_data in tasks_data.items():
                 task = Task(
-                    name=task_data.get("name", "Untitled Task"),
-                    deadline=task_data.get("deadline", None),
+                    name=task_data.get("name", task_id),
+                    deadline=task_data.get("deadline"),
                     status=task_data.get("status", "To Do"),
-                    order=task_data.get("order", 0),
+                    order=int(task_data.get("order", 0)),
                     description=task_data.get("description", ""),
                     url=task_data.get("url", ""),
+                    owner=task_data.get("owner", ""),
                     colour=task_data.get("colour", "default"),
                 )
                 tasks.append(task)
@@ -281,6 +287,7 @@ class TaskManager:
                 "description": getattr(task, "description", ""),
                 "url": getattr(task, "url", ""),
                 "colour": getattr(task, "colour", "default"),
+                "owner": getattr(task, "owner", ""),
             }
 
         if task_to_update is not None:
@@ -342,6 +349,11 @@ class TaskManager:
         self.deadline_entry_time.set("")
         self.status_combobox.set("")
         self.colour_combobox.set("default")
+        # clear owner selection
+        try:
+            self.owner_var.set("")
+        except Exception:
+            pass
 
     def on_click(self, event):
         """Handle mouse click on task tree"""
@@ -456,12 +468,14 @@ class TaskManager:
 
             status = self.status_combobox.get()
             colour = self.colour_combobox.get() or "default"
+            owner = self.owner_var.get() or ""
 
             task = Task(
                 name=task_name,
                 deadline=deadline,
                 status=status,
                 colour=colour,
+                owner=owner,
                 order=len(self.tasks),
             )
             self.tasks.append(task)
@@ -501,6 +515,11 @@ class TaskManager:
             self.toggle_deadline_entries()
             self.status_combobox.set(task.status)
             self.colour_combobox.set(task.colour or "default")
+            # set owner into combobox
+            try:
+                self.owner_var.set(getattr(task, "owner", "") or "")
+            except Exception:
+                pass
 
             # Change the Add Task button to Save Changes
             self.add_button.configure(
@@ -519,6 +538,7 @@ class TaskManager:
 
             original_task.status = self.status_combobox.get()
             original_task.colour = self.colour_combobox.get() or "default"
+            original_task.owner = self.owner_var.get() or ""
 
             try:
                 self.save_tasks_to_database()
@@ -538,6 +558,14 @@ class TaskManager:
         # allow master window to be reasonably resizable
         try:
             self.master.minsize(700, 400)
+        except Exception:
+            pass
+
+        # Improve treeview appearance (row height & fonts)
+        style = ttk.Style()
+        try:
+            style.configure("Treeview", rowheight=24, font=("Arial", 11))
+            style.configure("Treeview.Heading", font=("Arial", 11, "bold"))
         except Exception:
             pass
 
@@ -582,16 +610,42 @@ class TaskManager:
         )
         self.colour_combobox.grid(row=0, column=6, padx=5, pady=5)
         self.colour_combobox.set("default")
+        # make comboboxes wider so long names are readable
+        try:
+            self.colour_combobox.config(width=22)
+        except Exception:
+            pass
 
         # Status selection
         self.status_label = ttk.Label(task_frame, text="Status:")
         self.status_label.grid(row=0, column=7, padx=5, pady=5, sticky="w")
         self.status_combobox = ttk.Combobox(task_frame, values=["To Do", "In Progress"])
         self.status_combobox.grid(row=0, column=8, padx=5, pady=5)
+        try:
+            self.status_combobox.config(width=14)
+            self.task_entry.config(width=48)
+        except Exception:
+            pass
+
+        # Owner selection (added)
+        self.owner_var = tk.StringVar(value="")
+        owner_choices = [""] + OWNERS
+        self.owner_label = ttk.Label(task_frame, text="Owner:")
+        self.owner_label.grid(row=0, column=9, padx=5, pady=5, sticky="w")
+        self.owner_combobox = ttk.Combobox(
+            task_frame,
+            textvariable=self.owner_var,
+            values=owner_choices,
+            state="readonly",
+            width=14,
+        )
+        self.owner_combobox.grid(row=0, column=10, padx=5, pady=5)
+        self.owner_combobox.set("")
 
         # Buttons
         button_frame = ttk.Frame(task_frame)
-        button_frame.grid(row=0, column=9, columnspan=3, padx=5, pady=5, sticky="e")
+        # moved buttons to column 11 to accommodate Owner combobox
+        button_frame.grid(row=0, column=11, columnspan=3, padx=5, pady=5, sticky="e")
 
         self.add_button = ttk.Button(
             button_frame, text="Add Task", command=self.add_task
@@ -608,23 +662,30 @@ class TaskManager:
         )
         self.refresh_button.pack(side=tk.LEFT, padx=2)
 
-        # Create task treeview (column "Colour" renamed to "Priority" for UI)
+        # Create task treeview (column "Colour" renamed to "Priority" for UI) and include Owner
         self.task_tree = ttk.Treeview(
             main_frame,
-            columns=("Task", "Deadline", "Status", "Priority"),
+            columns=("Task", "Deadline", "Status", "Owner", "Priority"),
             show="headings",
         )
         self.task_tree.heading("Task", text="Task")
         self.task_tree.heading("Deadline", text="Deadline")
         self.task_tree.heading("Status", text="Status")
+        self.task_tree.heading("Owner", text="Owner")
         self.task_tree.heading("Priority", text="Priority")
         self.task_tree.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 
-        # Configure column widths and stretching for better resizing behavior
-        self.task_tree.column("Task", anchor="w", width=300, stretch=True)
+        # Set sensible initial column widths and allow key columns to stretch
+        self.task_tree.column("Task", anchor="w", width=340, stretch=True)
         self.task_tree.column("Deadline", anchor="center", width=160, stretch=True)
         self.task_tree.column("Status", anchor="center", width=120, stretch=False)
-        self.task_tree.column("Priority", anchor="center", width=120, stretch=False)
+        self.task_tree.column("Owner", anchor="center", width=140, stretch=False)
+        self.task_tree.column("Priority", anchor="center", width=220, stretch=True)
+
+        # Recompute column widths proportionally on resize
+        main_frame.bind("<Configure>", self._resize_columns)
+        # small delayed call to ensure initial sizing after layout
+        self.master.after(100, lambda: self._resize_columns())
 
         # Configure tag colours for the treeview
         for colour_name, colour_values in self.colour_options.items():
@@ -768,12 +829,31 @@ class TaskManager:
         self.task_tree.delete(*self.task_tree.get_children())
         for task in self.tasks:
             deadline_display = task.deadline if task.deadline else "No deadline"
-            values = (task.name, deadline_display, task.status, task.colour)
+            values = (task.name, deadline_display, task.status, task.owner or "", task.colour)
             item = self.task_tree.insert("", tk.END, values=values)
             self.task_tree.item(item, tags=(task.colour,))
+        # ensure columns are adjusted after repopulating
+        self._resize_columns()
 
-
-
+    def _resize_columns(self, event=None):
+        """Adjust column widths proportionally to available treeview width."""
+        try:
+            total = self.task_tree.winfo_width()
+            if total <= 10:
+                return
+            # allocate approximate proportions
+            task_w = int(total * 0.44)
+            deadline_w = int(total * 0.22)
+            status_w = int(total * 0.12)
+            owner_w = int(total * 0.12)
+            priority_w = max(int(total - (task_w + deadline_w + status_w + owner_w)), 100)
+            self.task_tree.column("Task", width=task_w)
+            self.task_tree.column("Deadline", width=deadline_w)
+            self.task_tree.column("Status", width=status_w)
+            self.task_tree.column("Owner", width=owner_w)
+            self.task_tree.column("Priority", width=priority_w)
+        except Exception:
+            pass
 
 
 class ToolTip:
