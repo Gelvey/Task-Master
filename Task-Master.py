@@ -160,6 +160,9 @@ class TaskManager:
 
         # Drag-and-drop tracking data (Treeview created in UI setup)
         self.drag_data = {"item": None, "initial_index": None}
+        
+        # Track which task is being edited
+        self.editing_task = None
 
         self.tasks = self.load_tasks_from_database()
 
@@ -341,6 +344,34 @@ class TaskManager:
                 logging.error(f"Failed to save local tasks file: {e}")
                 raise
 
+    def delete_task_from_database(self, task_name):
+        """Delete a task by name from Firebase or local JSON"""
+        if USE_FIREBASE:
+            try:
+                task_ref = db.reference(f"users/{self.username}/tasks/{task_name}")
+                task_ref.delete()
+                logging.info(f"Deleted task '{task_name}' from Firebase for user {self.username}")
+            except Exception as e:
+                logging.error(f"Failed to delete task from Firebase: {e}")
+                raise
+        else:
+            local_file = f"tasks_{self.username}.json"
+            try:
+                tasks_data = {}
+                if os.path.isfile(local_file):
+                    with open(local_file, "r", encoding="utf-8") as f:
+                        tasks_data = json.load(f) or {}
+                
+                # Remove the old task entry if it exists
+                if task_name in tasks_data:
+                    del tasks_data[task_name]
+                    with open(local_file, "w", encoding="utf-8") as f:
+                        json.dump(tasks_data, f, indent=2)
+                    logging.info(f"Deleted task '{task_name}' locally for user {self.username}")
+            except Exception as e:
+                logging.error(f"Failed to delete task from local file: {e}")
+                raise
+
     def clear_task_entry(self):
         self.task_entry.delete(0, tk.END)
         self.deadline_var.set(False)
@@ -460,6 +491,12 @@ class TaskManager:
     def add_task(self):
         if self.validate_input():
             task_name = self.task_entry.get().strip()
+            
+            # Check for duplicate task names
+            if any(t.name.lower() == task_name.lower() for t in self.tasks):
+                messagebox.showerror("Duplicate Task", f"A task named '{task_name}' already exists.")
+                return
+            
             deadline = None
             if self.deadline_var.get():
                 deadline_date = self.deadline_entry_date.get()
@@ -483,9 +520,19 @@ class TaskManager:
             try:
                 self.save_tasks_to_database()
                 self.update_task_tree()
+                self.update_status_bar()
                 self.clear_task_entry()
+                self.reset_add_button()
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save tasks: {e}")
+                self.reset_add_button()
+
+    def reset_add_button(self):
+        """Reset the Add Task button to its default state"""
+        self.add_button.configure(
+            text="Add Task", command=self.add_task
+        )
+        self.editing_task = None
 
     def edit_task(self):
         selected_items = self.task_tree.selection()
@@ -521,15 +568,25 @@ class TaskManager:
             except Exception:
                 pass
 
-            # Change the Add Task button to Save Changes
+            # Store the task being edited and change button
+            self.editing_task = task
             self.add_button.configure(
                 text="Save Changes", command=lambda: self.save_edited_task(task)
             )
 
     def save_edited_task(self, original_task):
         if self.validate_input():
+            # Store the old name before updating (for handling renames in the database)
+            old_name = original_task.name
+            new_name = self.task_entry.get().strip()
+            
+            # Check for duplicate task names (excluding the current task being edited)
+            if new_name.lower() != old_name.lower() and any(t.name.lower() == new_name.lower() for t in self.tasks):
+                messagebox.showerror("Duplicate Task", f"A task named '{new_name}' already exists.")
+                return
+            
             # Update the task with new values
-            original_task.name = self.task_entry.get().strip()
+            original_task.name = new_name
             original_task.deadline = None
             if self.deadline_var.get():
                 deadline_date = self.deadline_entry_date.get()
@@ -541,13 +598,21 @@ class TaskManager:
             original_task.owner = self.owner_var.get() or ""
 
             try:
-                self.save_tasks_to_database()
+                # If the name changed, delete the old entry and save everything
+                if old_name != original_task.name:
+                    self.delete_task_from_database(old_name)
+                    self.save_tasks_to_database()
+                else:
+                    # If name didn't change, just update this task
+                    self.save_tasks_to_database(original_task)
+                
                 self.update_task_tree()
+                self.update_status_bar()
                 self.clear_task_entry()
-                # Reset the Add Task button
-                self.add_button.configure(text="Add Task", command=self.add_task)
+                self.reset_add_button()
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save tasks: {e}")
+                self.reset_add_button()
 
     def setup_ui(self):
         # Create main frame with grid configuration
@@ -569,9 +634,26 @@ class TaskManager:
         except Exception:
             pass
 
+        # Search/filter frame
+        search_frame = ttk.Frame(main_frame)
+        search_frame.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        
+        self.search_label = ttk.Label(search_frame, text="Search:")
+        self.search_label.pack(side=tk.LEFT, padx=5)
+        
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=30)
+        self.search_entry.pack(side=tk.LEFT, padx=5)
+        self.search_var.trace("w", lambda *args: self.filter_tasks())
+        
+        # Status bar (task counts and overdue indicator)
+        self.status_var = tk.StringVar(value="")
+        self.status_bar = ttk.Label(search_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        self.status_bar.pack(side=tk.RIGHT, padx=5, fill=tk.X, expand=True)
+        
         # Create task entry widgets
         task_frame = ttk.LabelFrame(main_frame, text="Add/Edit Task")
-        task_frame.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        task_frame.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
         # Configure task_frame grid
         task_frame.grid_columnconfigure(1, weight=1)  # Make task entry expandable
@@ -658,7 +740,7 @@ class TaskManager:
         self.edit_button.pack(side=tk.LEFT, padx=2)
 
         self.refresh_button = ttk.Button(
-            button_frame, text="↻", width=3, command=self.refresh_tasks
+            button_frame, text="↻", width=3, command=self.refresh_tasks_with_feedback
         )
         self.refresh_button.pack(side=tk.LEFT, padx=2)
 
@@ -673,7 +755,7 @@ class TaskManager:
         self.task_tree.heading("Status", text="Status")
         self.task_tree.heading("Owner", text="Owner")
         self.task_tree.heading("Priority", text="Priority")
-        self.task_tree.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+        self.task_tree.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
 
         # Set sensible initial column widths and allow key columns to stretch
         self.task_tree.column("Task", anchor="w", width=340, stretch=True)
@@ -699,8 +781,11 @@ class TaskManager:
         scrollbar = ttk.Scrollbar(
             main_frame, orient="vertical", command=self.task_tree.yview
         )
-        scrollbar.grid(row=1, column=1, sticky="ns")
+        scrollbar.grid(row=2, column=1, sticky="ns")
         self.task_tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Bind keyboard shortcuts for task entry
+        self.task_entry.bind("<Return>", lambda e: self.handle_task_entry_submit())
 
         # Configure selection and bind drag/drop + right-click context menu
         self.task_tree.configure(selectmode="browse")
@@ -807,6 +892,66 @@ class TaskManager:
             self.task_tree.item(item, tags=(task.colour,))
         # ensure columns are adjusted after repopulating
         self._resize_columns()
+        self.update_status_bar()
+
+    def update_status_bar(self):
+        """Update the status bar with task counts and overdue indicator"""
+        total_tasks = len(self.tasks)
+        completed_tasks = len([t for t in self.tasks if t.status == "In Progress"])
+        to_do_tasks = len([t for t in self.tasks if t.status == "To Do"])
+        
+        # Check for overdue tasks
+        overdue_count = 0
+        now = datetime.now()
+        for task in self.tasks:
+            if task.deadline and task.status != "In Progress":
+                try:
+                    deadline_datetime = datetime.strptime(task.deadline, "%Y-%m-%d %H:%M")
+                    if deadline_datetime < now:
+                        overdue_count += 1
+                except Exception:
+                    pass
+        
+        # Build status message
+        status_msg = f"Total: {total_tasks} | To Do: {to_do_tasks} | In Progress: {completed_tasks}"
+        if overdue_count > 0:
+            status_msg += f" | ⚠ {overdue_count} overdue"
+        
+        self.status_var.set(status_msg)
+
+    def filter_tasks(self):
+        """Filter tasks based on search query"""
+        search_term = self.search_var.get().lower()
+        self.task_tree.delete(*self.task_tree.get_children())
+        
+        for task in self.tasks:
+            # Show task if search term matches task name, description, or owner (case-insensitive)
+            if (search_term == "" or 
+                search_term in task.name.lower() or 
+                search_term in task.owner.lower()):
+                deadline_display = task.deadline if task.deadline else "No deadline"
+                values = (task.name, deadline_display, task.status, task.owner or "", task.colour)
+                item = self.task_tree.insert("", tk.END, values=values)
+                self.task_tree.item(item, tags=(task.colour,))
+        
+        self._resize_columns()
+
+    def refresh_tasks_with_feedback(self):
+        """Refresh tasks and show brief feedback"""
+        self.status_var.set("Refreshing...")
+        self.master.update()
+        self.refresh_tasks()
+        self.master.after(500, lambda: self.status_var.set("Refreshed!"))
+        self.master.after(2000, self.update_status_bar)
+
+    def handle_task_entry_submit(self):
+        """Handle task entry submission via Enter key"""
+        if self.editing_task is not None:
+            # If editing, save changes
+            self.save_edited_task(self.editing_task)
+        else:
+            # If adding new task
+            self.add_task()
 
     def _resize_columns(self, event=None):
         """Adjust column widths proportionally to available treeview width."""
