@@ -80,7 +80,15 @@ def load_config(base_dir: Path) -> Dict[str, Any]:
 
 
 def write_runtime_config(base_dir: Path, output_path: Path) -> Dict[str, Any]:
-    """Write the merged config to disk and return the generated data."""
+    """Write merged config to disk and return the generated data.
+
+    Args:
+        base_dir: Base directory used to locate configuration files.
+        output_path: File path where the merged configuration is written.
+
+    Returns:
+        The merged configuration dictionary.
+    """
     config = load_config(base_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as file:

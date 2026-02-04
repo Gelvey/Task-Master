@@ -84,7 +84,7 @@ Cloudflare Pages runs static sites. This deployment publishes the static UI from
 3. Set the build command to:
 
 ```bash
-pip install -r requirements.txt
+pip install -r ./requirements.txt
 python web_app/generate_runtime_config.py
 ```
 
