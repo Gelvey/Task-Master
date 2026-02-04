@@ -90,6 +90,9 @@ python web_app/generate_runtime_config.py
 
 Run the command from the repository root so the requirements file is found.
 
+For production, keep `FLASK_DEBUG=0` and override `FLASK_HOST` if you need to
+bind the server to a different interface.
+
 4. Set the build output directory to `web_app/public`.
 5. Add the environment variables from the table above in the Cloudflare Pages project settings.
 6. Deploy the site.
