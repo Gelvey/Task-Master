@@ -19,11 +19,13 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
+        firebase = config["firebase"]
+        user_defaults = config["user_defaults"]
         return render_template(
             "index.html",
-            database_url=config["firebase"].get("database_url") or "Not configured",
-            default_owner=config["user_defaults"].get("default_owner", ""),
-            owners=config["user_defaults"].get("owners", []),
+            database_url=firebase.get("database_url") or "Not configured",
+            default_owner=user_defaults.get("default_owner", ""),
+            owners=user_defaults.get("owners", []),
         )
 
     @app.get("/api/tasks")

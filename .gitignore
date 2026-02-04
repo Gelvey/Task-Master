@@ -1,0 +1,7 @@
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Web app runtime config
+web_app/public/runtime-config.json
