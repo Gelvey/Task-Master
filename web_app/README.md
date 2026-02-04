@@ -8,7 +8,7 @@ This folder contains a minimal Python web app variant of Task-Master that is com
 2. Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -r ./requirements.txt
 ```
 
 3. Run the app:
@@ -77,7 +77,7 @@ This writes `web_app/public/runtime-config.json`, which the UI will load automat
 
 ## Cloudflare Pages Deployment
 
-Cloudflare Pages runs static sites. This deployment publishes the static UI from `web_app/public` and uses a build step to generate a runtime config JSON during deployment. The Flask API routes only run locally or in a separate backend.
+Cloudflare Pages runs static sites, so this deployment publishes only the static UI from `web_app/public` and generates a runtime config JSON during the build. The Flask API routes only run locally or in a separate backend.
 
 1. Push this repository to GitHub (or update it).
 2. Create a new Cloudflare Pages project connected to the repository.
