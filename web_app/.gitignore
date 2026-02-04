@@ -36,6 +36,7 @@ flask_session/
 data/
 *.json
 !requirements.json
+!vercel.json
 
 # IDE
 .vscode/
