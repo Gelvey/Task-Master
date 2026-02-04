@@ -37,20 +37,20 @@ const loadTasks = async () => {
   try {
     const response = await fetch("/api/tasks");
     if (!response.ok) {
-      alert("Server error loading tasks.");
+      alert(`Server error loading tasks (status ${response.status}).`);
       taskList.innerHTML = "";
       return;
     }
     const tasks = await parseJson(response);
     if (!Array.isArray(tasks)) {
-      alert("Invalid response loading tasks.");
+      alert("Invalid response loading tasks (expected a list).");
       taskList.innerHTML = "";
       return;
     }
     taskList.innerHTML = "";
     tasks.forEach(renderTask);
   } catch (error) {
-    alert("Network error loading tasks.");
+    alert("Network error loading tasks. Check your connection.");
     taskList.innerHTML = "";
   }
 };
@@ -88,7 +88,7 @@ const addTask = async (event) => {
     taskForm.reset();
     await loadTasks();
   } catch (error) {
-    alert("Unable to add task.");
+    alert("Network error while adding task. Check your connection.");
   }
 };
 

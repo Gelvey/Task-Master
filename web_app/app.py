@@ -75,6 +75,13 @@ def create_app() -> Flask:
 app = create_app()
 
 if __name__ == "__main__":
+    if (
+        os.getenv("FLASK_ENV") == "production"
+        and os.getenv("FLASK_DEBUG") == "1"
+    ):
+        raise RuntimeError(
+            "Disable FLASK_DEBUG when running in production."
+        )
     app.run(
         host=os.getenv("FLASK_HOST", "127.0.0.1"),
         port=int(os.getenv("FLASK_PORT", "5000")),
