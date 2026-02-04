@@ -69,23 +69,27 @@ const addTask = async (event) => {
     return;
   }
 
-  const response = await fetch("/api/tasks", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch("/api/tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) {
-    const error = await parseJson(response);
-    const message = error && error.error ? error.error : "Unable to add task.";
-    alert(message);
-    return;
+    if (!response.ok) {
+      const error = await parseJson(response);
+      const message = error && error.error ? error.error : "Unable to add task.";
+      alert(message);
+      return;
+    }
+
+    taskForm.reset();
+    await loadTasks();
+  } catch (error) {
+    alert("Unable to add task.");
   }
-
-  taskForm.reset();
-  await loadTasks();
 };
 
 const loadRuntimeConfig = async () => {

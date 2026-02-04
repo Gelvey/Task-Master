@@ -17,6 +17,7 @@ def create_app() -> Flask:
     app = Flask(__name__, static_folder="public", template_folder="templates")
     config = load_config(BASE_DIR)
 
+    # In-memory demo storage (resets on restart).
     tasks: list[Dict[str, Any]] = []
 
     @app.get("/")
