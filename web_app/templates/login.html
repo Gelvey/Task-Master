@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Task-Master - Login{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-box">
+        <h1>Task-Master</h1>
+        <p class="subtitle">Web Application</p>
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" class="form-control" 
+                       placeholder="Enter your username" required autofocus>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">Login</button>
+        </form>
+        
+        <p class="help-text">Enter any username to continue. Your tasks will be saved to your account.</p>
+    </div>
+</div>
+{% endblock %}

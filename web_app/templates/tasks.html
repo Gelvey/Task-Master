@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Task-Master - Tasks{% endblock %}
+
+{% block content %}
+<div class="tasks-container">
+    <header class="app-header">
+        <h1>Task-Master</h1>
+        <div class="user-info">
+            <span class="username">{{ username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm">Logout</a>
+        </div>
+    </header>
+
+    <div class="task-form">
+        <h2>Add New Task</h2>
+        <form id="taskForm">
+            <div class="form-row">
+                <div class="form-group flex-2">
+                    <label for="taskName">Task Name:</label>
+                    <input type="text" id="taskName" class="form-control" 
+                           placeholder="Enter task name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskStatus">Status:</label>
+                    <select id="taskStatus" class="form-control">
+                        <option value="To Do">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Complete">Complete</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="hasDeadline"> Has Deadline
+                    </label>
+                </div>
+                
+                <div class="form-group deadline-inputs" style="display: none;">
+                    <label for="deadlineDate">Deadline Date:</label>
+                    <input type="date" id="deadlineDate" class="form-control">
+                </div>
+                
+                <div class="form-group deadline-inputs" style="display: none;">
+                    <label for="deadlineTime">Deadline Time:</label>
+                    <input type="time" id="deadlineTime" class="form-control">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="taskColour">Priority:</label>
+                    <select id="taskColour" class="form-control">
+                        {% for key, value in colour_options.items() %}
+                        <option value="{{ key }}">{{ value.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                {% if owners %}
+                <div class="form-group">
+                    <label for="taskOwner">Owner:</label>
+                    <select id="taskOwner" class="form-control">
+                        <option value="">None</option>
+                        {% for owner in owners %}
+                        <option value="{{ owner }}">{{ owner }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group flex-1">
+                    <label for="taskDescription">Description:</label>
+                    <textarea id="taskDescription" class="form-control" rows="2" 
+                              placeholder="Task description (optional)"></textarea>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group flex-1">
+                    <label for="taskUrl">URL:</label>
+                    <input type="url" id="taskUrl" class="form-control" 
+                           placeholder="https://example.com (optional)">
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add Task</button>
+                <button type="button" id="cancelEdit" class="btn btn-secondary" style="display: none;">Cancel Edit</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="task-list-section">
+        <h2>Your Tasks</h2>
+        
+        <div class="filter-buttons">
+            <button class="btn btn-sm filter-btn active" data-filter="all">All</button>
+            <button class="btn btn-sm filter-btn" data-filter="To Do">To Do</button>
+            <button class="btn btn-sm filter-btn" data-filter="In Progress">In Progress</button>
+            <button class="btn btn-sm filter-btn" data-filter="Complete">Complete</button>
+        </div>
+        
+        <div id="taskList" class="task-list">
+            <p class="loading">Loading tasks...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div id="taskModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTaskName"></h2>
+        <div class="modal-body">
+            <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+            <p><strong>Deadline:</strong> <span id="modalDeadline"></span></p>
+            <p><strong>Priority:</strong> <span id="modalPriority"></span></p>
+            <p><strong>Owner:</strong> <span id="modalOwner"></span></p>
+            <p><strong>Description:</strong></p>
+            <p id="modalDescription" class="description-text"></p>
+            <p><strong>URL:</strong> <a id="modalUrl" href="#" target="_blank"></a></p>
+            
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="editTaskBtn">Edit</button>
+                <button class="btn btn-danger" id="deleteTaskBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const colourOptions = {{ colour_options | tojson }};
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
+{% endblock %}
