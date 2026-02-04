@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import BadRequest
 
 from config_loader import load_config
 
@@ -42,7 +43,7 @@ def create_app() -> Flask:
             )
         try:
             payload = request.get_json()
-        except Exception:
+        except BadRequest:
             return jsonify({"error": "Invalid JSON payload."}), 400
         name = str(payload.get("name", "")).strip()
         status = str(payload.get("status", "To Do")).strip()

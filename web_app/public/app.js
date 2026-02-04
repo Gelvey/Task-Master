@@ -25,11 +25,34 @@ const renderTask = (task) => {
   taskList.appendChild(item);
 };
 
+const parseJson = async (response) => {
+  try {
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+};
+
 const loadTasks = async () => {
-  const response = await fetch("/api/tasks");
-  const tasks = await response.json();
-  taskList.innerHTML = "";
-  tasks.forEach(renderTask);
+  try {
+    const response = await fetch("/api/tasks");
+    if (!response.ok) {
+      alert("Unable to load tasks.");
+      taskList.innerHTML = "";
+      return;
+    }
+    const tasks = await parseJson(response);
+    if (!Array.isArray(tasks)) {
+      alert("Unable to load tasks.");
+      taskList.innerHTML = "";
+      return;
+    }
+    taskList.innerHTML = "";
+    tasks.forEach(renderTask);
+  } catch (error) {
+    alert("Unable to load tasks.");
+    taskList.innerHTML = "";
+  }
 };
 
 const addTask = async (event) => {
@@ -55,8 +78,9 @@ const addTask = async (event) => {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    alert(error.error || "Unable to add task.");
+    const error = await parseJson(response);
+    const message = error && error.error ? error.error : "Unable to add task.";
+    alert(message);
     return;
   }
 

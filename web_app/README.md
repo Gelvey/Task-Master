@@ -19,6 +19,8 @@ python web_app/app.py
 
 4. Visit `http://127.0.0.1:5000` in your browser.
 
+The demo API stores tasks in memory, so entries reset whenever the server restarts.
+
 ## Configuration & Environment Variables
 
 The web app reads configuration in the following order:
@@ -85,6 +87,8 @@ Cloudflare Pages runs static sites. This deployment publishes the static UI from
 pip install -r requirements.txt
 python web_app/generate_runtime_config.py
 ```
+
+Run the command from the repository root so the requirements file is found.
 
 4. Set the build output directory to `web_app/public`.
 5. Add the environment variables from the table above in the Cloudflare Pages project settings.
