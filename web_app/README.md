@@ -22,6 +22,12 @@ A modern Python web application version of Task-Master, designed for deployment 
 web_app/
 ├── app.py                  # Main Flask application
 ├── requirements.txt        # Python dependencies
+├── Procfile                # Heroku deployment config
+├── runtime.txt             # Python version for Heroku
+├── vercel.json             # Vercel deployment config
+├── .gitignore              # Git ignore rules
+├── .env                    # Environment variables (not committed)
+├── README.md               # This file
 ├── static/
 │   ├── css/
 │   │   └── style.css      # Stylesheet
@@ -135,29 +141,18 @@ Since CloudFlare Workers has limitations with Flask, here are recommended altern
    npm install -g vercel
    ```
 
-2. Create a `vercel.json` in the `web_app` directory:
-   ```json
-   {
-     "builds": [
-       {
-         "src": "app.py",
-         "use": "@vercel/python"
-       }
-     ],
-     "routes": [
-       {
-         "src": "/(.*)",
-         "dest": "app.py"
-       }
-     ]
-   }
-   ```
+2. The `vercel.json` configuration file is already included in the web_app directory.
 
 3. Deploy:
    ```bash
    cd web_app
    vercel
    ```
+
+4. Set environment variables in Vercel dashboard:
+   - `SECRET_KEY`
+   - `FIREBASE_DATABASE_URL` (optional)
+   - `OWNERS` (optional)
 
 #### Google Cloud Run
 
@@ -170,14 +165,12 @@ Since CloudFlare Workers has limitations with Flask, here are recommended altern
 #### Heroku
 
 1. Install Heroku CLI
-2. Create a `Procfile` in `web_app` directory:
-   ```
-   web: python app.py
-   ```
-
+2. The `Procfile` and `runtime.txt` are already included in the web_app directory.
 3. Deploy:
    ```bash
    heroku create task-master-app
+   heroku config:set SECRET_KEY=your-secret-key
+   heroku config:set FIREBASE_DATABASE_URL=your-firebase-url (optional)
    git subtree push --prefix web_app heroku main
    ```
 
