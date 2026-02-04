@@ -16,7 +16,7 @@ const renderTask = (task) => {
   status.textContent = `Status: ${task.status || "To Do"}`;
 
   const owner = document.createElement("p");
-  owner.textContent = `Owner: ${task.owner || ""}`;
+  owner.textContent = `Owner: ${task.owner || "Unassigned"}`;
 
   const deadline = document.createElement("p");
   deadline.textContent = `Deadline: ${task.deadline || "None"}`;
@@ -37,20 +37,20 @@ const loadTasks = async () => {
   try {
     const response = await fetch("/api/tasks");
     if (!response.ok) {
-      alert("Unable to load tasks.");
+      alert("Server error loading tasks.");
       taskList.innerHTML = "";
       return;
     }
     const tasks = await parseJson(response);
     if (!Array.isArray(tasks)) {
-      alert("Unable to load tasks.");
+      alert("Invalid response loading tasks.");
       taskList.innerHTML = "";
       return;
     }
     taskList.innerHTML = "";
     tasks.forEach(renderTask);
   } catch (error) {
-    alert("Unable to load tasks.");
+    alert("Network error loading tasks.");
     taskList.innerHTML = "";
   }
 };

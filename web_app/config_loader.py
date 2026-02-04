@@ -28,7 +28,10 @@ def _load_ini(path: Path) -> configparser.ConfigParser:
 
 
 def _split_owners(raw_value: str) -> list[str]:
-    """Parse owners from comma/semicolon or space-separated values."""
+    """Parse owners from comma/semicolon or space-separated values.
+
+    Use commas/semicolons when owner names include spaces.
+    """
     if not raw_value:
         return []
     cleaned = raw_value.replace(";", ",")
