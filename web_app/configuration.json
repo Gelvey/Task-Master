@@ -1,0 +1,6 @@
+{
+  "firebase": {
+    "database_url": "https://your-project-id.firebasedatabase.app",
+    "project_id": "your-project-id"
+  }
+}

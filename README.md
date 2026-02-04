@@ -64,3 +64,19 @@ This project is licensed under the [MIT License](LICENSE).
 
 - Circuit
 - Gelvey
+
+---
+
+## Task-Master Web (Cloudflare Pages)
+
+A Cloudflare Pages-compatible web variant lives in `web_app/`.
+
+- Web app overview and deployment steps: [web_app/README.md](web_app/README.md)
+- Configuration supports environment variables plus `configuration.json` and `config.ini`.
+
+Quick start:
+
+```bash
+pip install -r requirements.txt
+python web_app/app.py
+```

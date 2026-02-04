@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task-Master Web</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Task-Master Web</h1>
+        <p class="subtitle">Cloudflare Pages-ready Python web app variant.</p>
+      </header>
+
+      <section class="config">
+        <h2>Configuration</h2>
+        <div class="config-grid">
+          <div>
+            <strong>Firebase Database URL</strong>
+            <p>{{ database_url }}</p>
+          </div>
+          <div>
+            <strong>Default Owner</strong>
+            <p>{{ default_owner or 'Not set' }}</p>
+          </div>
+          <div>
+            <strong>Owners</strong>
+            <p>{{ owners|join(', ') if owners else 'Not configured' }}</p>
+          </div>
+        </div>
+        <details class="config-runtime">
+          <summary>Runtime config snapshot</summary>
+          <pre id="runtime-config">Loading...</pre>
+        </details>
+      </section>
+
+      <section class="tasks">
+        <h2>Tasks</h2>
+        <form id="task-form" class="task-form">
+          <input type="text" id="task-name" placeholder="Task name" required />
+          <input type="text" id="task-deadline" placeholder="Deadline (YYYY-MM-DD HH:MM)" />
+          <select id="task-status">
+            <option value="To Do">To Do</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Complete">Complete</option>
+          </select>
+          <input type="text" id="task-owner" placeholder="Owner" />
+          <button type="submit">Add Task</button>
+        </form>
+        <ul id="task-list" class="task-list"></ul>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 firebase-admin
 tkcalendar
 python-dotenv
+flask
 # Dev/test utilities (optional)
 pytest
 flake8

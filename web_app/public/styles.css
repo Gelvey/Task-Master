@@ -1,0 +1,113 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f7fb;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f5f7fb;
+  color: #1f2933;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+header {
+  margin-bottom: 24px;
+}
+
+.subtitle {
+  color: #52606d;
+}
+
+.config {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+  margin-bottom: 24px;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.config-runtime {
+  margin-top: 12px;
+}
+
+.config-runtime pre {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.tasks {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+}
+
+.task-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.task-form input,
+.task-form select,
+.task-form button {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd2d9;
+  font-size: 0.95rem;
+}
+
+.task-form button {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.task-form button:hover {
+  background: #1d4ed8;
+}
+
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.task-item {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 0;
+}
+
+.task-item:last-child {
+  border-bottom: none;
+}
+
+.task-item h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.task-item p {
+  margin: 0;
+  color: #52606d;
+  font-size: 0.9rem;
+}
