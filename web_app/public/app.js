@@ -9,12 +9,19 @@ const configText = document.getElementById("runtime-config");
 const renderTask = (task) => {
   const item = document.createElement("li");
   item.className = "task-item";
-  item.innerHTML = `
-    <h3>${task.name}</h3>
-    <p>Status: ${task.status || "To Do"}</p>
-    <p>Owner: ${task.owner || ""}</p>
-    <p>Deadline: ${task.deadline || "None"}</p>
-  `;
+  const title = document.createElement("h3");
+  title.textContent = task.name;
+
+  const status = document.createElement("p");
+  status.textContent = `Status: ${task.status || "To Do"}`;
+
+  const owner = document.createElement("p");
+  owner.textContent = `Owner: ${task.owner || ""}`;
+
+  const deadline = document.createElement("p");
+  deadline.textContent = `Deadline: ${task.deadline || "None"}`;
+
+  item.append(title, status, owner, deadline);
   taskList.appendChild(item);
 };
 
@@ -61,6 +68,9 @@ const loadRuntimeConfig = async () => {
   try {
     const response = await fetch("/runtime-config.json");
     if (!response.ok) {
+      if (configText) {
+        configText.textContent = "Configuration not available.";
+      }
       return;
     }
     const data = await response.json();
@@ -69,6 +79,9 @@ const loadRuntimeConfig = async () => {
     }
   } catch (error) {
     console.warn("Runtime config not available.");
+    if (configText) {
+      configText.textContent = "Configuration not available.";
+    }
   }
 };
 

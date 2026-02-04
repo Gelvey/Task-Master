@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -34,9 +35,19 @@ def create_app() -> Flask:
 
     @app.post("/api/tasks")
     def add_task():
-        payload = request.get_json(silent=True) or {}
+        if request.mimetype != "application/json":
+            return (
+                jsonify({"error": "Expected application/json payload."}),
+                415,
+            )
+        try:
+            payload = request.get_json()
+        except Exception:
+            return jsonify({"error": "Invalid JSON payload."}), 400
         name = str(payload.get("name", "")).strip()
-        status = str(payload.get("status", "To Do")).strip() or "To Do"
+        status = str(payload.get("status", "To Do")).strip()
+        if not status:
+            status = "To Do"
         owner = str(payload.get("owner", "")).strip()
         deadline = str(payload.get("deadline", "")).strip()
 
@@ -62,4 +73,8 @@ def create_app() -> Flask:
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=bool(int(os.getenv("FLASK_DEBUG", "0"))),
+    )

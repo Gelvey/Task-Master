@@ -17,7 +17,7 @@ pip install -r requirements.txt
 python web_app/app.py
 ```
 
-4. Visit `http://localhost:5000` in your browser.
+4. Visit `http://127.0.0.1:5000` in your browser.
 
 ## Configuration & Environment Variables
 
@@ -75,13 +75,14 @@ This writes `web_app/public/runtime-config.json`, which the UI will load automat
 
 ## Cloudflare Pages Deployment
 
-Cloudflare Pages runs static sites. To keep the Python app compatible, use the static assets in `web_app/public` and generate a runtime config JSON during deployment.
+Cloudflare Pages runs static sites. This deployment publishes the static UI from `web_app/public` and uses a build step to generate a runtime config JSON during deployment. The Flask API routes only run locally or in a separate backend.
 
 1. Push this repository to GitHub (or update it).
 2. Create a new Cloudflare Pages project connected to the repository.
 3. Set the build command to:
 
 ```bash
+pip install -r requirements.txt
 python web_app/generate_runtime_config.py
 ```
 

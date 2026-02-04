@@ -30,8 +30,10 @@ def _load_ini(path: Path) -> configparser.ConfigParser:
 def _split_owners(raw_value: str) -> list[str]:
     if not raw_value:
         return []
-    cleaned = raw_value.replace(";", ",").replace(" ", ",")
-    return [owner.strip() for owner in cleaned.split(",") if owner.strip()]
+    cleaned = raw_value.replace(";", ",")
+    if "," in cleaned:
+        return [owner.strip() for owner in cleaned.split(",") if owner.strip()]
+    return [owner.strip() for owner in cleaned.split() if owner.strip()]
 
 
 def load_config(base_dir: Path) -> Dict[str, Any]:
@@ -74,6 +76,7 @@ def load_config(base_dir: Path) -> Dict[str, Any]:
 
 
 def write_runtime_config(base_dir: Path, output_path: Path) -> Dict[str, Any]:
+    """Write the merged config to disk and return the generated data."""
     config = load_config(base_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as file:
