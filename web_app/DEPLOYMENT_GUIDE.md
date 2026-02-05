@@ -19,13 +19,16 @@ Visit `http://localhost:5000`
 1. Push code to GitHub
 2. Visit [railway.app](https://railway.app)
 3. Connect GitHub repo
-4. Railway auto-detects Flask and deploys
-5. Add environment variables in dashboard
+4. **IMPORTANT:** Go to Settings → Root Directory and set to `web_app`
+5. Railway auto-detects Flask and deploys
+6. Add environment variables in dashboard
 
 **Environment Variables:**
 - `SECRET_KEY` - Your secret key for sessions
 - `FIREBASE_DATABASE_URL` - (Optional) Firebase Realtime Database URL
 - `OWNERS` - (Optional) Space-separated list of task owners
+
+**Note:** If you don't set the Root Directory to `web_app`, Railway won't find your Flask app. Alternatively, commit the `railway.json` file from the project root which configures this automatically.
 
 ### Option 2: Vercel (Fast Serverless)
 
@@ -102,6 +105,11 @@ CloudFlare Workers doesn't support Flask directly. Consider:
 For CloudFlare specifically, you would need to refactor to JavaScript/TypeScript Workers.
 
 ## 🆘 Troubleshooting
+
+**Railway "No start command found" error?**
+- Set Root Directory to `web_app` in Railway Settings
+- OR ensure `railway.json` is committed to your repo root
+- Verify `gunicorn` is in `web_app/requirements.txt`
 
 **Port 5000 in use?**
 ```python
