@@ -24,8 +24,13 @@ Visit `http://localhost:5000`
 6. Add environment variables in dashboard
 
 **Environment Variables:**
-- `SECRET_KEY` - Your secret key for sessions
+- `SECRET_KEY` - Your secret key for sessions (required)
+- `TASKMASTER_USERNAME` - (Optional) Username for single-user mode - skips login
+- `ALLOWED_IPS` - (Optional) Comma-separated IP whitelist (e.g., `192.168.1.1,203.0.113.5`)
 - `FIREBASE_DATABASE_URL` - (Optional) Firebase Realtime Database URL
+- `FIREBASE_PROJECT_ID` - (Optional) Firebase project ID (if not using credentials.json)
+- `FIREBASE_PRIVATE_KEY` - (Optional) Firebase private key (escape newlines as \\n)
+- `FIREBASE_CLIENT_EMAIL` - (Optional) Firebase service account email
 - `OWNERS` - (Optional) Space-separated list of task owners
 
 **Note:** If you don't set the Root Directory to `web_app`, Railway won't find your Flask app. Alternatively, commit the `railway.json` file from the project root which configures this automatically.
@@ -62,19 +67,38 @@ git subtree push --prefix web_app heroku main
 
 ## 🔥 Firebase Setup (Optional)
 
+### Method 1: Environment Variables (Recommended for Railway/Cloud)
+
 1. Create Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
 2. Enable Realtime Database
-3. Generate service account credentials
-4. Download as `credentials.json`
-5. Place in parent directory (same location as desktop app)
-6. Set `FIREBASE_DATABASE_URL` environment variable
+3. Generate service account credentials (download JSON)
+4. Extract values from the JSON and set as environment variables:
+   - `FIREBASE_DATABASE_URL` - Your database URL
+   - `FIREBASE_PROJECT_ID` - The project_id field
+   - `FIREBASE_PRIVATE_KEY` - The private_key field (escape \\n as \\\\n)
+   - `FIREBASE_CLIENT_EMAIL` - The client_email field
+   - `FIREBASE_CLIENT_ID` - The client_id field
+   - `FIREBASE_CLIENT_CERT_URL` - The client_x509_cert_url field
+
+### Method 2: credentials.json File (For Local Development)
+
+1. Download Firebase service account credentials as JSON
+2. Place as `credentials.json` in parent directory (same location as desktop app)
+3. Set `FIREBASE_DATABASE_URL` environment variable
 
 ## ⚙️ Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `SECRET_KEY` | Yes (prod) | Flask session secret key |
+| `TASKMASTER_USERNAME` | No | Fixed username for single-user mode (skips login) |
+| `ALLOWED_IPS` | No | Comma-separated IP whitelist (e.g., `1.2.3.4,5.6.7.8`) |
 | `FIREBASE_DATABASE_URL` | No | Firebase Realtime Database URL |
+| `FIREBASE_PROJECT_ID` | No | Firebase project ID (for env-based config) |
+| `FIREBASE_PRIVATE_KEY` | No | Firebase private key (replace \\n with \\\\n) |
+| `FIREBASE_CLIENT_EMAIL` | No | Firebase service account email |
+| `FIREBASE_CLIENT_ID` | No | Firebase client ID |
+| `FIREBASE_CLIENT_CERT_URL` | No | Firebase client cert URL |
 | `OWNERS` | No | Space-separated list of task owners |
 
 ## 📦 What's Included

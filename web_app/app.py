@@ -31,20 +31,49 @@ app.config['SESSION_TYPE'] = 'filesystem'
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Single-user mode - if set, username is fixed and no login required
+SINGLE_USER_MODE = os.getenv('TASKMASTER_USERNAME')
+
+# IP Whitelist configuration
+ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',') if os.getenv('ALLOWED_IPS') else []
+ALLOWED_IPS = [ip.strip() for ip in ALLOWED_IPS if ip.strip()]  # Clean up whitespace
+
 # Firebase configuration
 FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
 USE_FIREBASE = False
 
-if FIREBASE_AVAILABLE:
+if FIREBASE_AVAILABLE and FIREBASE_DATABASE_URL:
     try:
-        cred_path = os.path.join(os.path.dirname(__file__), "..", "credentials.json")
-        if FIREBASE_DATABASE_URL and os.path.isfile(cred_path):
-            cred = credentials.Certificate(cred_path)
+        # Try to initialize from environment variables first
+        firebase_creds = {
+            "type": os.getenv("FIREBASE_TYPE", "service_account"),
+            "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+            "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
+            "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+            "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+            "auth_uri": os.getenv("FIREBASE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": os.getenv("FIREBASE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL")
+        }
+        
+        # Check if all required Firebase env vars are present
+        if all([firebase_creds["project_id"], firebase_creds["private_key"], firebase_creds["client_email"]]):
+            cred = credentials.Certificate(firebase_creds)
             firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
             USE_FIREBASE = True
-            logger.info("Initialized Firebase backend")
+            logger.info("Initialized Firebase backend from environment variables")
         else:
-            logger.warning("Firebase not configured or credentials.json missing; using local storage.")
+            # Fallback to credentials.json file
+            cred_path = os.path.join(os.path.dirname(__file__), "..", "credentials.json")
+            if os.path.isfile(cred_path):
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
+                USE_FIREBASE = True
+                logger.info("Initialized Firebase backend from credentials.json")
+            else:
+                logger.warning("Firebase credentials not found in environment or file; using local storage.")
     except Exception as e:
         logger.error(f"Failed to initialize Firebase: {e}")
         USE_FIREBASE = False
@@ -61,11 +90,38 @@ COLOUR_OPTIONS = {
 }
 
 
+def check_ip_whitelist():
+    """Check if the request IP is in the whitelist"""
+    if not ALLOWED_IPS:
+        return True  # No whitelist configured, allow all
+    
+    # Get the client IP address
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip:
+        # X-Forwarded-For can contain multiple IPs, take the first one
+        client_ip = client_ip.split(',')[0].strip()
+    
+    is_allowed = client_ip in ALLOWED_IPS
+    if not is_allowed:
+        logger.warning(f"Access denied for IP: {client_ip}")
+    return is_allowed
+
+
+@app.before_request
+def ip_whitelist_check():
+    """Check IP whitelist before processing any request"""
+    if not check_ip_whitelist():
+        return jsonify({'error': 'Access denied', 'message': 'Your IP address is not authorized'}), 403
+
+
 def login_required(f):
-    """Decorator to require login for routes"""
+    """Decorator to require login for routes (unless in single-user mode)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'username' not in session:
+        if SINGLE_USER_MODE:
+            # In single-user mode, automatically set the username
+            session['username'] = SINGLE_USER_MODE
+        elif 'username' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -178,6 +234,9 @@ def delete_task(username, task_id):
 @app.route('/')
 def index():
     """Redirect to login or tasks page"""
+    if SINGLE_USER_MODE:
+        session['username'] = SINGLE_USER_MODE
+        return redirect(url_for('tasks'))
     if 'username' in session:
         return redirect(url_for('tasks'))
     return redirect(url_for('login'))
@@ -186,6 +245,11 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page"""
+    # If in single-user mode, skip login and go straight to tasks
+    if SINGLE_USER_MODE:
+        session['username'] = SINGLE_USER_MODE
+        return redirect(url_for('tasks'))
+    
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         if username:

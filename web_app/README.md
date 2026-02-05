@@ -5,6 +5,8 @@ A modern Python web application version of Task-Master, designed for deployment 
 ## Features
 
 - **User Authentication**: Simple username-based authentication with session management
+- **Single-User Mode**: Optional fixed username via environment variable (skips login)
+- **IP Whitelist**: Restrict access to specific IP addresses
 - **Task Management**: Create, read, update, and delete tasks
 - **Task Status**: Track tasks as "To Do", "In Progress", or "Complete"
 - **Deadlines**: Set optional deadlines with date and time
@@ -13,7 +15,7 @@ A modern Python web application version of Task-Master, designed for deployment 
 - **Descriptions & URLs**: Add detailed descriptions and related URLs to tasks
 - **Drag & Drop**: Reorder tasks by dragging and dropping
 - **Filtering**: Filter tasks by status (All, To Do, In Progress, Complete)
-- **Firebase Integration**: Store tasks in Firebase Realtime Database (with local JSON fallback)
+- **Firebase Integration**: Store tasks in Firebase via env vars or credentials.json (with local JSON fallback)
 - **Responsive Design**: Modern, mobile-friendly interface
 
 ## Project Structure
@@ -65,7 +67,15 @@ web_app/
    Create a `.env` file in the `web_app` directory:
    ```env
    SECRET_KEY=your-secret-key-here
+   TASKMASTER_USERNAME=myusername
+   ALLOWED_IPS=192.168.1.1,203.0.113.5,198.51.100.42
    FIREBASE_DATABASE_URL=https://your-project-id.firebasedatabase.app/
+   FIREBASE_PROJECT_ID=your-project-id
+   FIREBASE_PRIVATE_KEY_ID=your-private-key-id
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+   FIREBASE_CLIENT_ID=your-client-id
+   FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/...
    OWNERS=User1 User2 User3
    ```
 
@@ -208,12 +218,52 @@ async function handleRequest(request) {
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `SECRET_KEY` | Flask session secret key | Yes (production) |
+| `TASKMASTER_USERNAME` | Single-user mode username (skips login if set) | No |
+| `ALLOWED_IPS` | Comma-separated list of allowed IP addresses | No (if empty, all IPs allowed) |
 | `FIREBASE_DATABASE_URL` | Firebase Realtime Database URL | No (falls back to local JSON) |
+| `FIREBASE_PROJECT_ID` | Firebase project ID | No (required if using env-based Firebase) |
+| `FIREBASE_PRIVATE_KEY_ID` | Firebase private key ID | No |
+| `FIREBASE_PRIVATE_KEY` | Firebase private key (with \\n for newlines) | No |
+| `FIREBASE_CLIENT_EMAIL` | Firebase service account email | No |
+| `FIREBASE_CLIENT_ID` | Firebase client ID | No |
+| `FIREBASE_CLIENT_CERT_URL` | Firebase client certificate URL | No |
 | `OWNERS` | Space-separated list of task owners | No |
+
+**Note:** Firebase can be configured either via environment variables OR by placing `credentials.json` in the parent directory. Environment variables take precedence.
 
 ## Database Options
 
 ### Firebase Realtime Database (Cloud Storage)
+
+#### Option 1: Using Environment Variables (Recommended for Railway/Cloud)
+
+Set the following environment variables in your deployment platform:
+- `FIREBASE_DATABASE_URL`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_PRIVATE_KEY` (replace `\n` with `\\n` in the private key)
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_CLIENT_ID`
+- `FIREBASE_CLIENT_CERT_URL`
+
+**Quick Extract Helper:**
+```bash
+# Use the included helper script to extract all values
+python extract_firebase_env.py ../credentials.json
+```
+
+Or manually extract from your Firebase credentials.json:
+```bash
+# Get project_id
+cat credentials.json | grep project_id
+
+# Get private_key (escape newlines for environment variable)
+cat credentials.json | grep private_key | sed 's/\\n/\\\\n/g'
+
+# Get client_email
+cat credentials.json | grep client_email
+```
+
+#### Option 2: Using credentials.json File
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Create a project or select existing one
@@ -229,10 +279,12 @@ If Firebase is not configured, the app automatically uses local JSON files store
 ## Security Considerations
 
 1. **Change the SECRET_KEY** in production (use a strong random key)
-2. **Secure Firebase credentials** (never commit `credentials.json` to version control)
+2. **Secure Firebase credentials** (never commit `credentials.json` or `.env` to version control)
 3. **Use HTTPS** in production
-4. **Implement proper authentication** for production use (current version uses simple username sessions)
-5. **Set up Firebase Security Rules** to restrict access:
+4. **IP Whitelist**: Set `ALLOWED_IPS` environment variable to restrict access to specific IPs
+5. **Single-User Mode**: Set `TASKMASTER_USERNAME` to enforce a fixed username
+6. **Implement proper authentication** for production use (current version uses simple username sessions)
+7. **Set up Firebase Security Rules** to restrict access:
 
 ```json
 {
