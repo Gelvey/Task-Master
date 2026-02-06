@@ -304,7 +304,63 @@ select.form-control {
 .task-list {
     display: flex;
     flex-direction: column;
+    gap: 24px;
+}
+
+/* Priority Sections */
+.priority-section {
+    background: var(--github-dark-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.3s ease, opacity 0.3s ease;
+}
+
+.priority-header {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--soft-white);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.priority-tasks {
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+    min-height: 60px;
+}
+
+/* Drag States for Sections */
+.priority-section.drag-active {
+    border-color: var(--info-blue);
+    background: rgba(31, 111, 235, 0.05);
+    box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.2);
+}
+
+.priority-section.drag-locked {
+    opacity: 0.4;
+    pointer-events: none;
+    position: relative;
+}
+
+.priority-section.drag-locked::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(139, 148, 158, 0.1) 10px,
+        rgba(139, 148, 158, 0.1) 20px
+    );
+    border-radius: 12px;
+    pointer-events: none;
 }
 
 .task-item {
@@ -313,7 +369,7 @@ select.form-control {
     border-radius: 10px;
     padding: 18px;
     cursor: move;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -322,12 +378,29 @@ select.form-control {
 .task-item:hover {
     border-color: #8B949E;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    transform: translateY(-2px);
 }
 
 .task-item.dragging {
-    opacity: 0.5;
-    transform: scale(0.98);
+    opacity: 0.7;
+    transform: scale(0.95);
+    cursor: grabbing !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+/* Drop Target Indicator */
+.task-item.drop-target {
+    border-top: 3px solid var(--info-blue);
+    margin-top: 3px;
+}
+
+/* Drop Placeholder */
+.drop-placeholder {
+    border: 2px dashed var(--info-blue);
+    background: rgba(31, 111, 235, 0.1);
+    border-radius: 10px;
+    margin: 4px 0;
+    transition: height 0.2s ease;
 }
 
 .task-info {

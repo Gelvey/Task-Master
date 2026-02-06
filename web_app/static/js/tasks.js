@@ -3,7 +3,6 @@
 let tasks = [];
 let currentFilter = 'all';
 let editingTaskId = null;
-let draggedPriority = null;
 
 const PRIORITY_RANK = {
     'Important': 3,
@@ -88,6 +87,9 @@ async function loadTasks() {
 
 // Render tasks in the list
 function renderTasks() {
+    // Clean up any active drag state before rendering
+    DragManager.cleanup();
+    
     const filteredTasks = currentFilter === 'all' 
         ? tasks 
         : tasks.filter(task => task.status === currentFilter);
@@ -105,9 +107,37 @@ function renderTasks() {
         return (a.order || 0) - (b.order || 0);
     });
 
-    taskList.innerHTML = filteredTasks.map(task => createTaskElement(task)).join('');
+    // Group tasks by priority
+    const priorityGroups = {};
+    filteredTasks.forEach(task => {
+        const priority = task.colour || 'default';
+        if (!priorityGroups[priority]) {
+            priorityGroups[priority] = [];
+        }
+        priorityGroups[priority].push(task);
+    });
     
-    // Add drag and drop
+    // Render priority sections in order
+    const priorityOrder = ['Important', 'Moderately Important', 'Not Important', 'default'];
+    let html = '';
+    
+    priorityOrder.forEach(priority => {
+        if (priorityGroups[priority] && priorityGroups[priority].length > 0) {
+            const priorityLabel = priority === 'default' ? 'Other' : priority;
+            html += `
+                <div class="priority-section" data-priority="${priority}">
+                    <h3 class="priority-header">${priorityLabel}</h3>
+                    <div class="priority-tasks">
+                        ${priorityGroups[priority].map(task => createTaskElement(task)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    taskList.innerHTML = html;
+    
+    // Setup drag and drop with event delegation
     setupDragAndDrop();
     
     // Add click listeners
@@ -347,77 +377,247 @@ function editTask(taskId) {
     document.querySelector('.task-form').scrollIntoView({ behavior: 'smooth' });
 }
 
-// Drag and drop functionality
-function setupDragAndDrop() {
-    const taskItems = document.querySelectorAll('.task-item');
+// Drag and Drop Manager - Encapsulated state management
+const DragManager = (() => {
+    let draggedElement = null;
+    let draggedPriority = null;
+    let sourceSection = null;
+    let placeholder = null;
+    let dragOverTask = null;
     
-    taskItems.forEach(item => {
-        item.addEventListener('dragstart', handleDragStart);
-        item.addEventListener('dragover', handleDragOver);
-        item.addEventListener('drop', handleDrop);
-        item.addEventListener('dragend', handleDragEnd);
+    return {
+        start(element, priority, section) {
+            draggedElement = element;
+            draggedPriority = priority;
+            sourceSection = section;
+            
+            element.classList.add('dragging');
+            section.classList.add('drag-active');
+            
+            // Lock other sections
+            document.querySelectorAll('.priority-section').forEach(sec => {
+                if (sec !== section) {
+                    sec.classList.add('drag-locked');
+                }
+            });
+            
+            // Create placeholder
+            placeholder = document.createElement('div');
+            placeholder.className = 'drop-placeholder';
+            placeholder.style.height = element.offsetHeight + 'px';
+        },
+        
+        getDraggedElement() {
+            return draggedElement;
+        },
+        
+        getPriority() {
+            return draggedPriority;
+        },
+        
+        getSection() {
+            return sourceSection;
+        },
+        
+        updateDropTarget(target) {
+            if (dragOverTask && dragOverTask !== target) {
+                dragOverTask.classList.remove('drop-target');
+            }
+            dragOverTask = target;
+            if (target) {
+                target.classList.add('drop-target');
+            }
+        },
+        
+        showPlaceholder(beforeElement, container) {
+            if (placeholder && placeholder.parentNode !== container) {
+                if (beforeElement) {
+                    container.insertBefore(placeholder, beforeElement);
+                } else {
+                    container.appendChild(placeholder);
+                }
+            }
+        },
+        
+        removePlaceholder() {
+            if (placeholder && placeholder.parentNode) {
+                placeholder.parentNode.removeChild(placeholder);
+            }
+        },
+        
+        cleanup() {
+            if (draggedElement) {
+                draggedElement.classList.remove('dragging');
+            }
+            if (sourceSection) {
+                sourceSection.classList.remove('drag-active');
+            }
+            if (dragOverTask) {
+                dragOverTask.classList.remove('drop-target');
+            }
+            
+            document.querySelectorAll('.priority-section').forEach(sec => {
+                sec.classList.remove('drag-locked');
+            });
+            
+            this.removePlaceholder();
+            
+            draggedElement = null;
+            draggedPriority = null;
+            sourceSection = null;
+            dragOverTask = null;
+            placeholder = null;
+        },
+        
+        isActive() {
+            return draggedElement !== null;
+        }
+    };
+})();
+
+// Drag and drop functionality with event delegation
+let dragAndDropInitialized = false;
+
+function setupDragAndDrop() {
+    if (dragAndDropInitialized) return;
+    
+    // Use event delegation on task list
+    taskList.addEventListener('dragstart', handleDragStart);
+    taskList.addEventListener('dragover', handleDragOver);
+    taskList.addEventListener('drop', handleDrop);
+    taskList.addEventListener('dragend', handleDragEnd);
+    taskList.addEventListener('dragleave', handleDragLeave);
+    
+    // Clean up on window blur (tab switching)
+    window.addEventListener('blur', () => {
+        if (DragManager.isActive()) {
+            DragManager.cleanup();
+        }
     });
+    
+    dragAndDropInitialized = true;
 }
 
-let draggedElement = null;
-
 function handleDragStart(e) {
-    draggedElement = this;
-    this.classList.add('dragging');
-    draggedPriority = this.dataset.priority;
+    const taskItem = e.target.closest('.task-item');
+    if (!taskItem) return;
+    
+    const section = taskItem.closest('.priority-section');
+    const priority = section.dataset.priority;
+    
+    DragManager.start(taskItem, priority, section);
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', taskItem.innerHTML);
 }
 
 function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
+    if (!DragManager.isActive()) return;
+    
+    e.preventDefault();
+    
+    const taskItem = e.target.closest('.task-item');
+    const section = e.target.closest('.priority-section');
+    const draggedElement = DragManager.getDraggedElement();
+    
+    // Check if we're in the correct section
+    if (!section || section !== DragManager.getSection()) {
+        e.dataTransfer.dropEffect = 'none';
+        DragManager.updateDropTarget(null);
+        DragManager.removePlaceholder();
+        return;
     }
+    
     e.dataTransfer.dropEffect = 'move';
+    
+    // If over a task item (not the dragged one)
+    if (taskItem && taskItem !== draggedElement) {
+        DragManager.updateDropTarget(taskItem);
+        
+        const container = taskItem.parentNode;
+        const allItems = Array.from(container.querySelectorAll('.task-item:not(.dragging)'));
+        const targetIndex = allItems.indexOf(taskItem);
+        
+        // Determine if we should insert before or after
+        const rect = taskItem.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        
+        if (e.clientY < midpoint) {
+            DragManager.showPlaceholder(taskItem, container);
+        } else {
+            DragManager.showPlaceholder(taskItem.nextSibling, container);
+        }
+    } else if (section && !taskItem) {
+        // Over the section but not over a specific task
+        const container = section.querySelector('.priority-tasks');
+        if (container) {
+            DragManager.updateDropTarget(null);
+            DragManager.showPlaceholder(null, container);
+        }
+    }
+    
     return false;
 }
 
 function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (!DragManager.isActive()) return;
+    
+    const taskItem = e.target.closest('.task-item');
+    const section = e.target.closest('.priority-section');
+    const draggedElement = DragManager.getDraggedElement();
+    
+    // Only allow drops within the same section
+    if (!section || section !== DragManager.getSection()) {
+        DragManager.cleanup();
+        return false;
     }
     
-    if (draggedElement !== this) {
-        // Prevent moving between different priority groups
-        if (draggedElement.dataset.priority !== this.dataset.priority) {
-            alert('Tasks can only be moved within the same priority group.');
-            return false;
-        }
-        // Get all visible task items
-        const allItems = Array.from(document.querySelectorAll('.task-item'));
-        const draggedIndex = allItems.indexOf(draggedElement);
-        const targetIndex = allItems.indexOf(this);
+    const container = section.querySelector('.priority-tasks');
+    
+    if (taskItem && taskItem !== draggedElement) {
+        // Determine insertion point
+        const rect = taskItem.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
         
-        if (draggedIndex < targetIndex) {
-            this.parentNode.insertBefore(draggedElement, this.nextSibling);
+        if (e.clientY < midpoint) {
+            container.insertBefore(draggedElement, taskItem);
         } else {
-            this.parentNode.insertBefore(draggedElement, this);
+            container.insertBefore(draggedElement, taskItem.nextSibling);
         }
-        
-        // Update task order
-        updateTaskOrder();
+    } else if (!taskItem) {
+        // Dropped in empty space within section
+        container.appendChild(draggedElement);
     }
     
+    // Update task order
+    updateTaskOrder(DragManager.getPriority());
+    
+    DragManager.cleanup();
     return false;
 }
 
 function handleDragEnd(e) {
-    this.classList.remove('dragging');
-    draggedPriority = null;
+    DragManager.cleanup();
+}
+
+function handleDragLeave(e) {
+    // Only handle if we're leaving the task list entirely
+    if (!e.relatedTarget || !taskList.contains(e.relatedTarget)) {
+        if (DragManager.isActive()) {
+            DragManager.removePlaceholder();
+        }
+    }
 }
 
 // Update task order after drag and drop
-async function updateTaskOrder() {
-    const taskItems = document.querySelectorAll('.task-item');
-    // Only send the order for the priority group that was dragged
-    let taskIds = Array.from(taskItems).map(item => item.dataset.taskId);
-    if (draggedPriority) {
-        taskIds = Array.from(taskItems).filter(item => item.dataset.priority === draggedPriority).map(item => item.dataset.taskId);
-    }
+async function updateTaskOrder(priority) {
+    const section = document.querySelector(`.priority-section[data-priority="${priority}"]`);
+    if (!section) return;
+    
+    const taskItems = section.querySelectorAll('.task-item');
+    const taskIds = Array.from(taskItems).map(item => item.dataset.taskId);
     
     try {
         const response = await fetch('/api/tasks/reorder', {
@@ -429,6 +629,7 @@ async function updateTaskOrder() {
         const data = await response.json();
         
         if (data.success) {
+            // Refresh tasks data without full re-render
             await loadTasks();
         } else {
             showError('Failed to reorder tasks: ' + data.error);
