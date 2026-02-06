@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 import json
+import socket
 from functools import wraps
 from dotenv import load_dotenv
 
@@ -34,9 +35,9 @@ logger = logging.getLogger(__name__)
 # Single-user mode - if set, username is fixed and no login required
 SINGLE_USER_MODE = os.getenv('TASKMASTER_USERNAME')
 
-# IP Whitelist configuration
-ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',') if os.getenv('ALLOWED_IPS') else []
-ALLOWED_IPS = [ip.strip() for ip in ALLOWED_IPS if ip.strip()]  # Clean up whitespace
+# Host/IP Whitelist configuration
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS if host.strip()]  # Clean up whitespace
 
 # Firebase configuration
 FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
@@ -91,8 +92,8 @@ COLOUR_OPTIONS = {
 
 
 def check_ip_whitelist():
-    """Check if the request IP is in the whitelist"""
-    if not ALLOWED_IPS:
+    """Check if the request IP is in the whitelist (supports both IPs and hostnames with DNS lookup)"""
+    if not ALLOWED_HOSTS:
         return True  # No whitelist configured, allow all
     
     # Get the client IP address
@@ -101,10 +102,26 @@ def check_ip_whitelist():
         # X-Forwarded-For can contain multiple IPs, take the first one
         client_ip = client_ip.split(',')[0].strip()
     
-    is_allowed = client_ip in ALLOWED_IPS
-    if not is_allowed:
-        logger.warning(f"Access denied for IP: {client_ip}")
-    return is_allowed
+    # Check each allowed host/IP
+    for allowed_host in ALLOWED_HOSTS:
+        # If it's a direct IP match
+        if client_ip == allowed_host:
+            return True
+        
+        # Try DNS lookup (for hostnames). No caching for DynDNS support
+        try:
+            resolved_ip = socket.gethostbyname(allowed_host)
+            if client_ip == resolved_ip:
+                logger.info(f"Access granted for IP {client_ip} (resolved from hostname {allowed_host})")
+                return True
+        except socket.gaierror:
+            # Not a valid hostname, continue to next entry
+            pass
+        except Exception as e:
+            logger.warning(f"Error resolving hostname {allowed_host}: {e}")
+    
+    logger.warning(f"Access denied for IP: {client_ip}")
+    return False
 
 
 @app.before_request

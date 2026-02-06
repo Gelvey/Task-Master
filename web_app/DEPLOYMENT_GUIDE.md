@@ -26,7 +26,7 @@ Visit `http://localhost:5000`
 **Environment Variables:**
 - `SECRET_KEY` - Your secret key for sessions (required)
 - `TASKMASTER_USERNAME` - (Optional) Username for single-user mode - skips login
-- `ALLOWED_IPS` - (Optional) Comma-separated IP whitelist (e.g., `192.168.1.1,203.0.113.5`)
+- `ALLOWED_HOSTS` - (Optional) Comma-separated hostname/IP whitelist (e.g., `home.example.com,192.168.1.1,myhost.dyndns.org`). DNS lookup performed on each request, supports DynDNS
 - `FIREBASE_DATABASE_URL` - (Optional) Firebase Realtime Database URL
 - `FIREBASE_PROJECT_ID` - (Optional) Firebase project ID (if not using credentials.json)
 - `FIREBASE_PRIVATE_KEY` - (Optional) Firebase private key (escape newlines as \\n)
@@ -92,7 +92,7 @@ git subtree push --prefix web_app heroku main
 |----------|----------|-------------|
 | `SECRET_KEY` | Yes (prod) | Flask session secret key |
 | `TASKMASTER_USERNAME` | No | Fixed username for single-user mode (skips login) |
-| `ALLOWED_IPS` | No | Comma-separated IP whitelist (e.g., `1.2.3.4,5.6.7.8`) |
+| `ALLOWED_HOSTS` | No | Comma-separated hostname/IP whitelist (e.g., `home.example.com,1.2.3.4,myhost.dyndns.org`). DNS lookup on each request, DynDNS supported |
 | `FIREBASE_DATABASE_URL` | No | Firebase Realtime Database URL |
 | `FIREBASE_PROJECT_ID` | No | Firebase project ID (for env-based config) |
 | `FIREBASE_PRIVATE_KEY` | No | Firebase private key (replace \\n with \\\\n) |

@@ -68,7 +68,7 @@ web_app/
    ```env
    SECRET_KEY=your-secret-key-here
    TASKMASTER_USERNAME=myusername
-   ALLOWED_IPS=192.168.1.1,203.0.113.5,198.51.100.42
+   ALLOWED_HOSTS=home.example.com,192.168.1.1,myhost.dyndns.org,203.0.113.5
    FIREBASE_DATABASE_URL=https://your-project-id.firebasedatabase.app/
    FIREBASE_PROJECT_ID=your-project-id
    FIREBASE_PRIVATE_KEY_ID=your-private-key-id
@@ -219,7 +219,7 @@ async function handleRequest(request) {
 |----------|-------------|----------|
 | `SECRET_KEY` | Flask session secret key | Yes (production) |
 | `TASKMASTER_USERNAME` | Single-user mode username (skips login if set) | No |
-| `ALLOWED_IPS` | Comma-separated list of allowed IP addresses | No (if empty, all IPs allowed) |
+| `ALLOWED_HOSTS` | Comma-separated list of allowed hostnames and/or IP addresses (DNS lookup performed on each request, supports DynDNS) | No (if empty, all hosts allowed) |
 | `FIREBASE_DATABASE_URL` | Firebase Realtime Database URL | No (falls back to local JSON) |
 | `FIREBASE_PROJECT_ID` | Firebase project ID | No (required if using env-based Firebase) |
 | `FIREBASE_PRIVATE_KEY_ID` | Firebase private key ID | No |
@@ -281,7 +281,7 @@ If Firebase is not configured, the app automatically uses local JSON files store
 1. **Change the SECRET_KEY** in production (use a strong random key)
 2. **Secure Firebase credentials** (never commit `credentials.json` or `.env` to version control)
 3. **Use HTTPS** in production
-4. **IP Whitelist**: Set `ALLOWED_IPS` environment variable to restrict access to specific IPs
+4. **Host/IP Whitelist**: Set `ALLOWED_HOSTS` environment variable to restrict access to specific IPs or hostnames (supports DynDNS)
 5. **Single-User Mode**: Set `TASKMASTER_USERNAME` to enforce a fixed username
 6. **Implement proper authentication** for production use (current version uses simple username sessions)
 7. **Set up Firebase Security Rules** to restrict access:
