@@ -396,21 +396,46 @@ def reorder_tasks():
     try:
         data = request.get_json()
         task_ids = data.get('task_ids', [])
-        
+        if not task_ids:
+            return jsonify({'success': False, 'error': 'No task_ids provided'}), 400
+
         tasks = load_tasks(username)
-        
-        # Create a mapping of task_id to task
+
+        # Map and validate provided ids
         task_map = {task['id']: task for task in tasks}
-        
-        # Reorder tasks based on the provided order
-        reordered_tasks = []
-        for i, task_id in enumerate(task_ids):
-            if task_id in task_map:
-                task = task_map[task_id]
-                task['order'] = i
-                reordered_tasks.append(task)
-        
-        save_tasks(username, reordered_tasks)
+        for tid in task_ids:
+            if tid not in task_map:
+                return jsonify({'success': False, 'error': f'Task id not found: {tid}'}), 400
+
+        # All provided tasks must belong to the same priority (colour)
+        group_colour = task_map[task_ids[0]].get('colour', 'default')
+        for tid in task_ids:
+            if task_map[tid].get('colour', 'default') != group_colour:
+                return jsonify({'success': False, 'error': 'Reorder must be within a single priority group'}), 400
+
+        provided_set = set(task_ids)
+
+        # Ensure provided ids are a subset of the tasks that have the same colour
+        group_task_ids = [t['id'] for t in tasks if t.get('colour', 'default') == group_colour]
+        if not provided_set.issubset(set(group_task_ids)):
+            return jsonify({'success': False, 'error': 'Invalid task ids for priority group'}), 400
+
+        # Build new tasks list by replacing occurrences of the group's tasks with the new ordering
+        new_order_iter = iter(task_ids)
+        new_tasks = []
+        for t in tasks:
+            if t.get('colour', 'default') == group_colour and t['id'] in provided_set:
+                # take the next id from the provided ordering
+                next_id = next(new_order_iter)
+                new_tasks.append(task_map[next_id])
+            else:
+                new_tasks.append(t)
+
+        # Reassign order indexes
+        for idx, t in enumerate(new_tasks):
+            t['order'] = idx
+
+        save_tasks(username, new_tasks)
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error reordering tasks: {e}")

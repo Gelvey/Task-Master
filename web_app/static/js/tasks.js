@@ -3,6 +3,14 @@
 let tasks = [];
 let currentFilter = 'all';
 let editingTaskId = null;
+let draggedPriority = null;
+
+const PRIORITY_RANK = {
+    'Important': 3,
+    'Moderately Important': 2,
+    'Not Important': 1,
+    'default': 0
+};
 
 // DOM Elements
 const taskForm = document.getElementById('taskForm');
@@ -89,6 +97,14 @@ function renderTasks() {
         return;
     }
     
+    // Sort by priority (highest first) then by order
+    filteredTasks.sort((a, b) => {
+        const pa = PRIORITY_RANK[a.colour] || 0;
+        const pb = PRIORITY_RANK[b.colour] || 0;
+        if (pa !== pb) return pb - pa; // higher priority first
+        return (a.order || 0) - (b.order || 0);
+    });
+
     taskList.innerHTML = filteredTasks.map(task => createTaskElement(task)).join('');
     
     // Add drag and drop
@@ -112,7 +128,7 @@ function createTaskElement(task) {
     const isOverdue = isTaskOverdue(task);
     
     return `
-        <div class="task-item ${priorityClass}" data-task-id="${task.id}" draggable="true">
+        <div class="task-item ${priorityClass}" data-task-id="${task.id}" data-priority="${task.colour}" draggable="true">
             <div class="task-info">
                 <div class="task-name">${escapeHtml(task.name)}</div>
                 <div class="task-meta">
@@ -348,6 +364,7 @@ let draggedElement = null;
 function handleDragStart(e) {
     draggedElement = this;
     this.classList.add('dragging');
+    draggedPriority = this.dataset.priority;
     e.dataTransfer.effectAllowed = 'move';
 }
 
@@ -365,6 +382,11 @@ function handleDrop(e) {
     }
     
     if (draggedElement !== this) {
+        // Prevent moving between different priority groups
+        if (draggedElement.dataset.priority !== this.dataset.priority) {
+            alert('Tasks can only be moved within the same priority group.');
+            return false;
+        }
         // Get all visible task items
         const allItems = Array.from(document.querySelectorAll('.task-item'));
         const draggedIndex = allItems.indexOf(draggedElement);
@@ -385,12 +407,17 @@ function handleDrop(e) {
 
 function handleDragEnd(e) {
     this.classList.remove('dragging');
+    draggedPriority = null;
 }
 
 // Update task order after drag and drop
 async function updateTaskOrder() {
     const taskItems = document.querySelectorAll('.task-item');
-    const taskIds = Array.from(taskItems).map(item => item.dataset.taskId);
+    // Only send the order for the priority group that was dragged
+    let taskIds = Array.from(taskItems).map(item => item.dataset.taskId);
+    if (draggedPriority) {
+        taskIds = Array.from(taskItems).filter(item => item.dataset.priority === draggedPriority).map(item => item.dataset.taskId);
+    }
     
     try {
         const response = await fetch('/api/tasks/reorder', {
