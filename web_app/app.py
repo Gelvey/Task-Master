@@ -109,9 +109,13 @@ def check_ip_whitelist():
             return True
         
         # Try DNS lookup (for hostnames). No caching for DynDNS support
+        # Using getaddrinfo to support both IPv4 and IPv6
         try:
-            resolved_ip = socket.gethostbyname(allowed_host)
-            if client_ip == resolved_ip:
+            # Get all IP addresses (IPv4 and IPv6) for the hostname
+            addr_info = socket.getaddrinfo(allowed_host, None)
+            resolved_ips = [addr[4][0] for addr in addr_info]
+            
+            if client_ip in resolved_ips:
                 logger.info(f"Access granted for IP {client_ip} (resolved from hostname {allowed_host})")
                 return True
         except socket.gaierror:
