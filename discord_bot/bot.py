@@ -3,6 +3,7 @@ Task-Master Discord Bot
 Main entry point
 """
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 import logging
 import asyncio
@@ -11,6 +12,7 @@ from services.message_updater import MessageUpdater
 from services.reminder_service import ReminderService
 from discord_ui.select_menus import TaskFilterView
 from utils.logger import setup_logging
+from database.firebase_manager import DatabaseManager
 
 # Setup logging
 setup_logging()
@@ -28,19 +30,37 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 message_updater = MessageUpdater()
 reminder_service = ReminderService()
 
+# Database
+db_manager = None
+
 
 @bot.event
 async def on_ready():
     """Bot startup event"""
+    global db_manager
+    
     logger.info(f"Bot logged in as {bot.user.name} (ID: {bot.user.id})")
     logger.info(f"Connected to {len(bot.guilds)} guild(s)")
     
-    # Set bot instance in services
+    # Initialize database
+    db_manager = DatabaseManager(use_firebase=not Settings.USE_LOCAL_STORAGE)
+    
+    # Set bot instance and database in services
     message_updater.set_bot(bot)
+    message_updater.set_database(db_manager)
+    
     reminder_service.set_bot(bot)
+    reminder_service.set_database(db_manager)
     
     # Register persistent views
     bot.add_view(TaskFilterView())
+    
+    # Sync slash commands
+    try:
+        synced = await bot.tree.sync()
+        logger.info(f"Synced {len(synced)} slash command(s)")
+    except Exception as e:
+        logger.error(f"Failed to sync commands: {e}")
     
     # Initialize task boards
     await message_updater.initialize_task_boards()
@@ -84,33 +104,10 @@ async def before_reminder_checker():
     await bot.wait_until_ready()
 
 
-@bot.command(name="taskboard")
-@commands.has_permissions(administrator=True)
-async def create_taskboard(ctx):
-    """Admin command to manually create a task board in current channel"""
-    if ctx.channel.id not in Settings.TASK_CHANNELS:
-        await ctx.send("❌ This channel is not configured as a task channel.")
-        return
-    
-    await message_updater.update_task_board(ctx.channel)
-    await ctx.send("✅ Task board created/updated!", delete_after=5)
-    await ctx.message.delete()
+# Slash Commands
 
-
-@bot.command(name="refresh")
-async def refresh_taskboard(ctx):
-    """Command to manually refresh the task board"""
-    if ctx.channel.id not in Settings.TASK_CHANNELS:
-        await ctx.send("❌ This channel is not configured as a task channel.")
-        return
-    
-    await message_updater.update_task_board(ctx.channel)
-    await ctx.send("✅ Task board refreshed!", delete_after=5)
-    await ctx.message.delete(delay=5)
-
-
-@bot.command(name="help")
-async def help_command(ctx):
+@bot.tree.command(name="help", description="Show help information about the Task-Master bot")
+async def help_command(interaction: discord.Interaction):
     """Show help information"""
     embed = discord.Embed(
         title="📋 Task-Master Discord Bot Help",
@@ -166,26 +163,45 @@ async def help_command(ctx):
     )
     
     embed.add_field(
-        name="Commands",
-        value="`!help` - Show this help message\n"
-              "`!refresh` - Manually refresh the task board\n"
-              "`!taskboard` - (Admin) Create a new task board",
+        name="Slash Commands",
+        value="`/help` - Show this help message\n"
+              "`/refresh` - Manually refresh the task board\n"
+              "`/taskboard` - (Admin) Create a new task board",
         inline=False
     )
     
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@bot.event
-async def on_command_error(ctx, error):
-    """Handle command errors"""
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
-    elif isinstance(error, commands.CommandNotFound):
-        pass  # Ignore unknown commands
-    else:
-        logger.error(f"Command error: {error}")
-        await ctx.send(f"❌ An error occurred: {str(error)}")
+@bot.tree.command(name="refresh", description="Manually refresh the task board")
+async def refresh_taskboard(interaction: discord.Interaction):
+    """Command to manually refresh the task board"""
+    if interaction.channel_id not in Settings.TASK_CHANNELS:
+        await interaction.response.send_message(
+            "❌ This channel is not configured as a task channel.", 
+            ephemeral=True
+        )
+        return
+    
+    await interaction.response.defer(ephemeral=True)
+    await message_updater.update_task_board(interaction.channel)
+    await interaction.followup.send("✅ Task board refreshed!", ephemeral=True)
+
+
+@bot.tree.command(name="taskboard", description="(Admin) Create or update task board in this channel")
+@app_commands.default_permissions(administrator=True)
+async def create_taskboard(interaction: discord.Interaction):
+    """Admin command to manually create a task board in current channel"""
+    if interaction.channel_id not in Settings.TASK_CHANNELS:
+        await interaction.response.send_message(
+            "❌ This channel is not configured as a task channel.", 
+            ephemeral=True
+        )
+        return
+    
+    await interaction.response.defer(ephemeral=True)
+    await message_updater.update_task_board(interaction.channel)
+    await interaction.followup.send("✅ Task board created/updated!", ephemeral=True)
 
 
 def main():

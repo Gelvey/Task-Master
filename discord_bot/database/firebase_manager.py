@@ -65,12 +65,23 @@ class DatabaseManager:
                 logger.info("Firebase initialized from environment variables")
                 self.initialized = True
             else:
-                # Fallback to credentials.json in parent directory
-                cred_path = os.path.join(os.path.dirname(__file__), "..", "..", "credentials.json")
-                if os.path.isfile(cred_path):
+                # Try local credentials.json first (discord_bot directory)
+                local_cred_path = os.path.join(os.path.dirname(__file__), "..", "credentials.json")
+                # Fallback to parent directory credentials.json
+                parent_cred_path = os.path.join(os.path.dirname(__file__), "..", "..", "credentials.json")
+                
+                cred_path = None
+                if os.path.isfile(local_cred_path):
+                    cred_path = local_cred_path
+                    logger.info("Using local credentials.json from discord_bot directory")
+                elif os.path.isfile(parent_cred_path):
+                    cred_path = parent_cred_path
+                    logger.info("Using credentials.json from parent directory")
+                
+                if cred_path:
                     cred = credentials.Certificate(cred_path)
                     firebase_admin.initialize_app(cred, {"databaseURL": firebase_database_url})
-                    logger.info("Firebase initialized from credentials.json")
+                    logger.info(f"Firebase initialized from {cred_path}")
                     self.initialized = True
                 else:
                     logger.warning("Firebase credentials not found, using local storage")
@@ -214,3 +225,61 @@ class DatabaseManager:
         
         self.save_tasks(username, new_tasks)
         logger.info(f"Reordered tasks for user {username}")
+    
+    def get_bot_metadata(self, key: str) -> Optional[Dict]:
+        """Get bot metadata (message IDs, reminder tracking, etc.)"""
+        if self.use_firebase:
+            try:
+                metadata_ref = db.reference(f"bot_metadata/{key}")
+                data = metadata_ref.get()
+                return data
+            except Exception as e:
+                logger.error(f"Failed to load bot metadata from Firebase: {e}")
+                return None
+        else:
+            # Local JSON
+            metadata_file = os.path.join(self.data_dir, "bot_metadata.json")
+            if os.path.isfile(metadata_file):
+                try:
+                    with open(metadata_file, "r", encoding="utf-8") as f:
+                        all_metadata = json.load(f)
+                        return all_metadata.get(key)
+                except Exception as e:
+                    logger.error(f"Failed to read bot metadata file: {e}")
+                    return None
+            return None
+    
+    def save_bot_metadata(self, key: str, data: Dict):
+        """Save bot metadata (message IDs, reminder tracking, etc.)"""
+        if self.use_firebase:
+            try:
+                metadata_ref = db.reference(f"bot_metadata/{key}")
+                metadata_ref.set(data)
+                logger.info(f"Bot metadata '{key}' saved to Firebase")
+            except Exception as e:
+                logger.error(f"Failed to save bot metadata to Firebase: {e}")
+                raise
+        else:
+            # Local JSON
+            metadata_file = os.path.join(self.data_dir, "bot_metadata.json")
+            all_metadata = {}
+            
+            # Load existing metadata
+            if os.path.isfile(metadata_file):
+                try:
+                    with open(metadata_file, "r", encoding="utf-8") as f:
+                        all_metadata = json.load(f)
+                except Exception as e:
+                    logger.error(f"Failed to read existing bot metadata: {e}")
+            
+            # Update with new data
+            all_metadata[key] = data
+            
+            # Save back
+            try:
+                with open(metadata_file, "w", encoding="utf-8") as f:
+                    json.dump(all_metadata, f, indent=2)
+                logger.info(f"Bot metadata '{key}' saved locally")
+            except Exception as e:
+                logger.error(f"Failed to save bot metadata file: {e}")
+                raise

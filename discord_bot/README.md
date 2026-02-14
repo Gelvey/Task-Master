@@ -13,12 +13,14 @@ Discord bot integration for Task-Master task management system. Provides full ta
 - **Overdue Alerts**: Daily notifications for overdue tasks
 - **Multi-User Support**: Maps Discord users to Task-Master owners via environment variables
 - **Shared Database**: Uses same Firebase/local JSON backend as web app and desktop client
+- **Persistent Storage**: Message IDs and reminder tracking stored in database (survives bot restarts)
+- **Slash Commands**: Modern Discord slash commands for all bot interactions
 
 ## Prerequisites
 
 - Python 3.11 or higher
 - Discord bot token ([Create one here](https://discord.com/developers/applications))
-- Firebase credentials (shared with main Task-Master app) or local storage
+- Firebase credentials (can be configured locally for the bot) or local storage
 - Discord server with admin permissions to add the bot
 
 ## Installation
@@ -72,7 +74,23 @@ pip install -r requirements.txt
    - `TASK_CHANNELS`: Channel IDs where task boards will display (comma-separated)
    - `REMINDER_CHANNEL`: Channel ID for deadline reminders
    - `DISCORD_USER_*`: Map Discord user IDs to Task-Master owners
-   - Firebase credentials (copy from main app's `.env` or use `credentials.json`)
+   - Firebase credentials (see below)
+
+### 4a. Configure Firebase (Local to Bot)
+
+The Discord bot has its own Firebase configuration, independent of the web app. This allows hosting the bot separately.
+
+**Option 1: Environment Variables** (Recommended for production)
+- Set all `FIREBASE_*` variables in `.env` file
+
+**Option 2: Credentials File** (Easier for development)
+- Place `credentials.json` in the `discord_bot/` directory
+- The bot will automatically detect and use it
+
+**Option 3: Shared Credentials** (If bot runs alongside web app)
+- The bot will fall back to `../credentials.json` (parent directory)
+
+Priority order: Environment variables → `discord_bot/credentials.json` → `../credentials.json`
 
 ### 5. Get Discord IDs
 
@@ -106,6 +124,8 @@ python bot.py
 The bot should now:
 - Connect to Discord
 - Initialize task boards in configured channels
+- Sync slash commands
+- Load persisted message IDs and reminder tracking from database
 - Start listening for interactions
 
 ## Usage
@@ -158,9 +178,11 @@ The bot automatically checks for tasks with deadlines approaching within 24 hour
 
 ## Commands
 
-- `!help` - Show help information
-- `!refresh` - Manually refresh the task board
-- `!taskboard` - (Admin only) Create a new task board in current channel
+- `/help` - Show help information
+- `/refresh` - Manually refresh the task board
+- `/taskboard` - (Admin only) Create a new task board in current channel
+
+**Note**: All commands use Discord's slash command system. Type `/` in Discord to see available commands.
 
 ## Architecture
 

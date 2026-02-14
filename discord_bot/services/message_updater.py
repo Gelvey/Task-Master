@@ -15,11 +15,44 @@ class MessageUpdater:
     """Updates task board messages in Discord channels"""
     
     def __init__(self):
-        # Note: Message IDs are stored in memory only. On bot restart, the bot will
-        # lose track of existing task board messages and may create duplicates.
-        # For production, consider persisting this to a file or database.
         self.task_board_messages = {}  # {channel_id: message_id}
         self._bot = None
+        self._db = None
+    
+    def set_bot(self, bot):
+        """Set bot instance for accessing channels"""
+        self._bot = bot
+    
+    def set_database(self, db):
+        """Set database instance for persistence"""
+        self._db = db
+        self._load_message_ids()
+    
+    def _load_message_ids(self):
+        """Load persisted message IDs from database"""
+        if not self._db:
+            return
+        
+        try:
+            data = self._db.get_bot_metadata("task_board_messages")
+            if data:
+                # Convert string keys back to integers
+                self.task_board_messages = {int(k): v for k, v in data.items()}
+                logger.info(f"Loaded {len(self.task_board_messages)} task board message IDs from database")
+        except Exception as e:
+            logger.error(f"Failed to load message IDs: {e}")
+    
+    def _save_message_ids(self):
+        """Persist message IDs to database"""
+        if not self._db:
+            return
+        
+        try:
+            # Convert integer keys to strings for JSON compatibility
+            data = {str(k): v for k, v in self.task_board_messages.items()}
+            self._db.save_bot_metadata("task_board_messages", data)
+        except Exception as e:
+            logger.error(f"Failed to save message IDs: {e}")
     
     def set_bot(self, bot):
         """Set bot instance for accessing channels"""
@@ -55,6 +88,7 @@ class MessageUpdater:
                 
                 message = await channel.send(embed=embed, view=view)
                 self.task_board_messages[channel_id] = message.id
+                self._save_message_ids()
                 
                 logger.info(f"Initialized task board in channel {channel_id}")
             except Exception as e:
@@ -93,9 +127,11 @@ class MessageUpdater:
                     # Message was deleted, create new one
                     message = await channel.send(embed=embed, view=view)
                     self.task_board_messages[channel.id] = message.id
+                    self._save_message_ids()
             else:
                 message = await channel.send(embed=embed, view=view)
                 self.task_board_messages[channel.id] = message.id
+                self._save_message_ids()
             
             logger.info(f"Updated task board in channel {channel.id}")
         except Exception as e:
