@@ -71,11 +71,8 @@ class MessageUpdater:
                 from services.task_service import TaskService
                 task_service = TaskService()
                 
-                # Get all tasks (we'll show all users' tasks in the board)
-                all_tasks = []
-                for owner in Settings.USER_MAPPING.values():
-                    tasks = task_service.get_all_tasks(owner)
-                    all_tasks.extend(tasks)
+                # Get all tasks
+                all_tasks = task_service.get_all_tasks()
                 
                 embed = create_task_board_embed(all_tasks)
                 
@@ -98,15 +95,7 @@ class MessageUpdater:
             from services.task_service import TaskService
             task_service = TaskService()
             
-            if owner:
-                tasks = task_service.get_all_tasks(owner)
-            else:
-                # Get all tasks from all users
-                all_tasks = []
-                for owner_name in Settings.USER_MAPPING.values():
-                    tasks = task_service.get_all_tasks(owner_name)
-                    all_tasks.extend(tasks)
-                tasks = all_tasks
+            tasks = task_service.get_all_tasks(owner=owner)
             
             embed = create_task_board_embed(tasks, owner=owner, filter_status=filter_status)
             

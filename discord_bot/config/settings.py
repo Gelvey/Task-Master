@@ -20,6 +20,10 @@ class Settings:
     TASK_CHANNELS: List[int] = []
     REMINDER_CHANNEL: int = None
     
+    # Task-Master settings
+    TASKMASTER_USERNAME: str = os.getenv("TASKMASTER_USERNAME", "")
+    OWNERS: List[str] = []
+    
     # User mapping (Discord ID -> Owner name)
     USER_MAPPING: Dict[int, str] = {}
     
@@ -47,6 +51,12 @@ class Settings:
                 logger.error("Invalid TASK_CHANNELS format. Use comma-separated channel IDs.")
                 cls.TASK_CHANNELS = []
         
+        # Parse owners
+        owners_str = os.getenv("OWNERS", "")
+        if owners_str:
+            cls.OWNERS = owners_str.split()
+            logger.info(f"Loaded {len(cls.OWNERS)} task owners: {cls.OWNERS}")
+        
         # Parse reminder channel
         reminder_channel_str = os.getenv("REMINDER_CHANNEL", "")
         if reminder_channel_str:
@@ -69,13 +79,18 @@ class Settings:
         if not cls.DISCORD_BOT_TOKEN:
             raise ValueError("DISCORD_BOT_TOKEN is required")
         
+        if not cls.TASKMASTER_USERNAME:
+            logger.warning("No TASKMASTER_USERNAME configured. Using 'default' as username.")
+            cls.TASKMASTER_USERNAME = "default"
+        
         if not cls.TASK_CHANNELS:
             logger.warning("No TASK_CHANNELS configured. Bot will not display task boards.")
         
         if not cls.FIREBASE_DATABASE_URL and not cls.USE_LOCAL_STORAGE:
             logger.warning("No FIREBASE_DATABASE_URL and USE_LOCAL_STORAGE=false. Bot may not persist data.")
         
-        logger.info(f"Loaded settings: {len(cls.USER_MAPPING)} user mappings, "
+        logger.info(f"Loaded settings: username='{cls.TASKMASTER_USERNAME}', "
+                   f"{len(cls.OWNERS)} owners, {len(cls.USER_MAPPING)} user mappings, "
                    f"{len(cls.TASK_CHANNELS)} task channels")
     
     @classmethod

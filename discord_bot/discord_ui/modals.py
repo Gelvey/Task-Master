@@ -63,8 +63,8 @@ class AddTaskModal(ui.Modal, title="Add New Task"):
         task_service = TaskService()
         try:
             await task_service.add_task_from_modal(
-                owner=owner,
                 name=self.task_name.value,
+                owner=owner,
                 deadline=self.deadline.value if self.deadline.value else None,
                 priority=priority,
                 description=self.description.value if self.description.value else "",
@@ -147,9 +147,9 @@ class EditTaskModal(ui.Modal, title="Edit Task"):
         task_service = TaskService()
         try:
             await task_service.update_task_from_modal(
-                owner=owner,
                 task_id=self.task_id,
                 name=self.task_name.value,
+                owner=owner,
                 deadline=self.deadline.value if self.deadline.value else None,
                 priority=priority,
                 description=self.description.value if self.description.value else "",
@@ -202,7 +202,7 @@ class SelectTaskModal(ui.Modal, title="Select Task"):
         try:
             if self.action == "edit":
                 # Load task and open edit modal
-                task = await task_service.get_task_by_name(owner, self.task_name.value)
+                task = await task_service.get_task_by_name(self.task_name.value, owner=owner)
                 if not task:
                     await interaction.response.send_message(
                         f"❌ Task '{self.task_name.value}' not found.",
@@ -221,7 +221,7 @@ class SelectTaskModal(ui.Modal, title="Select Task"):
                 await interaction.response.send_modal(edit_modal)
                 
             elif self.action == "delete":
-                await task_service.delete_task(owner, self.task_name.value)
+                await task_service.delete_task(self.task_name.value)
                 await interaction.response.send_message(
                     f"✅ Task '{self.task_name.value}' deleted successfully!",
                     ephemeral=True
@@ -234,7 +234,7 @@ class SelectTaskModal(ui.Modal, title="Select Task"):
                     "to_do": "To Do"
                 }
                 new_status = status_map[self.action]
-                await task_service.update_task_status(owner, self.task_name.value, new_status)
+                await task_service.update_task_status(self.task_name.value, new_status)
                 await interaction.response.send_message(
                     f"✅ Task '{self.task_name.value}' marked as {new_status}!",
                     ephemeral=True

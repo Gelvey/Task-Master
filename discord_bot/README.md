@@ -71,9 +71,11 @@ pip install -r requirements.txt
 
 2. Edit `.env` and configure:
    - `DISCORD_BOT_TOKEN`: Your Discord bot token
+   - `TASKMASTER_USERNAME`: Global username for database access (e.g., "gelvey")
+   - `OWNERS`: Space-separated list of possible task assignees (e.g., "Circuit Gelvey")
    - `TASK_CHANNELS`: Channel IDs where task boards will display (comma-separated)
    - `REMINDER_CHANNEL`: Channel ID for deadline reminders
-   - `DISCORD_USER_*`: Map Discord user IDs to Task-Master owners
+   - `DISCORD_USER_*`: Map Discord user IDs to owners from OWNERS list
    - Firebase credentials (see below)
 
 ### 4a. Configure Firebase (Local to Bot)
@@ -102,14 +104,26 @@ To get channel and user IDs:
 
 ### 6. Configure User Mapping
 
-In `.env`, map Discord users to Task-Master owners:
+The bot uses three key configuration values:
+
+- **`TASKMASTER_USERNAME`**: The database username/account (e.g., "gelvey") - determines which database path to use (`users/{TASKMASTER_USERNAME}/tasks`)
+- **`OWNERS`**: Space-separated list of task assignees (e.g., "Circuit Gelvey") - who can be assigned to complete tasks
+- **`DISCORD_USER_*`**: Maps Discord user IDs to owners in the OWNERS list
+
+Example in `.env`:
 
 ```env
+TASKMASTER_USERNAME=gelvey
+OWNERS=Circuit Gelvey
 DISCORD_USER_123456789012345678=Circuit
 DISCORD_USER_987654321098765432=Gelvey
 ```
 
-Replace the numbers with actual Discord user IDs.
+This configuration means:
+- All tasks are stored under the "gelvey" database account
+- Tasks can be assigned to either "Circuit" or "Gelvey"
+- When Discord user 123456789012345678 interacts, they're identified as "Circuit"
+- When Discord user 987654321098765432 interacts, they're identified as "Gelvey"
 
 ## Running the Bot
 
