@@ -6,7 +6,6 @@ import logging
 from typing import Optional
 from config.settings import Settings
 from discord_ui.embeds import create_task_board_embed
-from discord_ui.buttons import TaskBoardButtons
 from discord_ui.select_menus import TaskFilterView
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,6 @@ class MessageUpdater:
                 
                 # Create view with buttons and filters
                 view = TaskFilterView()
-                view.add_item(TaskBoardButtons())
                 
                 message = await channel.send(embed=embed, view=view)
                 self.task_board_messages[channel_id] = message.id
@@ -83,7 +81,6 @@ class MessageUpdater:
             message_id = self.task_board_messages.get(channel.id)
             
             view = TaskFilterView()
-            view.add_item(TaskBoardButtons())
             
             if message_id:
                 try:

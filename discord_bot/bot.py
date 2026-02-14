@@ -9,7 +9,6 @@ import asyncio
 from config.settings import Settings
 from services.message_updater import MessageUpdater
 from services.reminder_service import ReminderService
-from discord_ui.buttons import TaskBoardButtons
 from discord_ui.select_menus import TaskFilterView
 from utils.logger import setup_logging
 
@@ -41,7 +40,6 @@ async def on_ready():
     reminder_service.set_bot(bot)
     
     # Register persistent views
-    bot.add_view(TaskBoardButtons())
     bot.add_view(TaskFilterView())
     
     # Initialize task boards
@@ -84,21 +82,6 @@ async def before_task_board_updater():
 async def before_reminder_checker():
     """Wait until bot is ready before starting reminder checker"""
     await bot.wait_until_ready()
-
-
-@bot.event
-async def on_interaction(interaction: discord.Interaction):
-    """Handle interactions (buttons, modals, etc.)"""
-    # Check if interaction is in allowed channel
-    if interaction.channel_id not in Settings.TASK_CHANNELS:
-        if interaction.type == discord.InteractionType.component:
-            await interaction.response.send_message(
-                "❌ This bot only works in designated task channels.",
-                ephemeral=True
-            )
-        return
-    
-    # Discord.py handles the rest automatically
 
 
 @bot.command(name="taskboard")

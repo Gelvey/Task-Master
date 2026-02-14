@@ -50,3 +50,10 @@ class TaskFilterView(View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TaskFilterSelect())
+        
+        # Add buttons from TaskBoardButtons inline
+        from .buttons import TaskBoardButtons
+        # Copy buttons from TaskBoardButtons to this view
+        button_view = TaskBoardButtons()
+        for item in button_view.children:
+            self.add_item(item)
