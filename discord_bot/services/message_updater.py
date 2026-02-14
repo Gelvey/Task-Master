@@ -54,10 +54,6 @@ class MessageUpdater:
         except Exception as e:
             logger.error(f"Failed to save message IDs: {e}")
     
-    def set_bot(self, bot):
-        """Set bot instance for accessing channels"""
-        self._bot = bot
-    
     async def initialize_task_boards(self):
         """Initialize task boards in all configured channels"""
         if not self._bot:

@@ -4,7 +4,7 @@ Firebase database manager - uses same backend as web app and desktop client
 import os
 import json
 import logging
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union, Any
 import firebase_admin
 from firebase_admin import credentials, db
 from .task_model import Task
@@ -226,7 +226,7 @@ class DatabaseManager:
         self.save_tasks(username, new_tasks)
         logger.info(f"Reordered tasks for user {username}")
     
-    def get_bot_metadata(self, key: str) -> Optional[Dict]:
+    def get_bot_metadata(self, key: str) -> Optional[Union[Dict, List]]:
         """Get bot metadata (message IDs, reminder tracking, etc.)"""
         if self.use_firebase:
             try:
@@ -249,7 +249,7 @@ class DatabaseManager:
                     return None
             return None
     
-    def save_bot_metadata(self, key: str, data: Dict):
+    def save_bot_metadata(self, key: str, data: Union[Dict, List]):
         """Save bot metadata (message IDs, reminder tracking, etc.)"""
         if self.use_firebase:
             try:

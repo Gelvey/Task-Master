@@ -54,10 +54,6 @@ class ReminderService:
         except Exception as e:
             logger.error(f"Failed to save reminded tasks: {e}")
     
-    def set_bot(self, bot):
-        """Set bot instance"""
-        self._bot = bot
-    
     async def check_and_send_reminders(self):
         """Check all tasks for upcoming deadlines and send reminders"""
         if not self._bot:
