@@ -13,7 +13,8 @@ class TaskService:
     """Service for task operations"""
     
     def __init__(self):
-        self.db = DatabaseManager(use_firebase=True)
+        from config.settings import Settings
+        self.db = DatabaseManager(use_firebase=not Settings.USE_LOCAL_STORAGE)
     
     def get_all_tasks(self, owner: str) -> List[Task]:
         """Get all tasks for an owner"""

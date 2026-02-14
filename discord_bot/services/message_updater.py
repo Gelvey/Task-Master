@@ -15,6 +15,9 @@ class MessageUpdater:
     """Updates task board messages in Discord channels"""
     
     def __init__(self):
+        # Note: Message IDs are stored in memory only. On bot restart, the bot will
+        # lose track of existing task board messages and may create duplicates.
+        # For production, consider persisting this to a file or database.
         self.task_board_messages = {}  # {channel_id: message_id}
         self._bot = None
     

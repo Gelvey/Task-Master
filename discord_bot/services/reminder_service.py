@@ -17,6 +17,8 @@ class ReminderService:
     
     def __init__(self):
         self._bot = None
+        # Note: Reminded tasks are tracked in memory only. On bot restart, users may
+        # receive duplicate reminders. For production, consider persisting this set.
         self.reminded_tasks = set()  # Track which tasks we've already reminded about
     
     def set_bot(self, bot):
