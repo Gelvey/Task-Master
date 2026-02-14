@@ -1,0 +1,14 @@
+# Discord.py library
+discord.py>=2.3.0
+
+# Firebase Admin SDK (same as main app)
+firebase-admin>=6.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Async utilities
+aiohttp>=3.9.0
+
+# Logging and monitoring
+colorlog>=6.7.0
