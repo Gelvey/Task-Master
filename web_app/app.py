@@ -209,9 +209,11 @@ def save_tasks(username, tasks):
     tasks_data = {}
     for task in tasks:
         task_id = task.get('id', task['name'])
+        task_uuid = task.get('uuid') or str(uuid.uuid4())
+        task['uuid'] = task_uuid
         tasks_data[task_id] = {
             'name': task['name'],
-            'uuid': task.get('uuid'),
+            'uuid': task_uuid,
             'deadline': task.get('deadline'),
             'status': task.get('status', 'To Do'),
             'order': task.get('order', 0),

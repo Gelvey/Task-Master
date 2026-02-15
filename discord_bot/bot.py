@@ -82,10 +82,12 @@ async def on_ready():
         await message_updater.initialize_task_boards()
     
     # Start background tasks
-    if not task_board_updater.is_running():
-        task_board_updater.start()
-    if not forum_sync_updater.is_running():
-        forum_sync_updater.start()
+    if Settings.TASK_FORUM_CHANNEL:
+        if not forum_sync_updater.is_running():
+            forum_sync_updater.start()
+    else:
+        if not task_board_updater.is_running():
+            task_board_updater.start()
     if not reminder_checker.is_running():
         reminder_checker.start()
     
@@ -96,8 +98,6 @@ async def on_ready():
 async def task_board_updater():
     """Background task to periodically update task boards"""
     try:
-        if Settings.TASK_FORUM_CHANNEL:
-            return
         await message_updater.update_all_task_boards()
         logger.debug("Task boards updated")
     except Exception as e:

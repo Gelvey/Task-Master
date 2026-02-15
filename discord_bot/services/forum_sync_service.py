@@ -72,9 +72,22 @@ class ForumSyncService:
         tasks = task_service.get_all_tasks()
 
         for task in tasks:
+            # Keep migration-safe fallback for legacy tasks while UUID backfill propagates.
             task_uuid = task.uuid or task.id or task.name
+            if not task.uuid:
+                logger.warning(f"Task '{task.name}' missing UUID during forum sync; using legacy fallback key.")
             thread = None
             thread_id = self.task_to_thread.get(task_uuid)
+            
+            # Migrate old mapping keys (name/id) to UUID to avoid duplicate thread creation.
+            if not thread_id:
+                for legacy_key in [task.id, task.name]:
+                    if legacy_key and legacy_key in self.task_to_thread:
+                        thread_id = self.task_to_thread.pop(legacy_key)
+                        self.task_to_thread[task_uuid] = thread_id
+                        self.thread_to_task[str(thread_id)] = task_uuid
+                        self._save_mappings()
+                        break
 
             if thread_id:
                 thread = self._bot.get_channel(int(thread_id))
@@ -89,9 +102,7 @@ class ForumSyncService:
                     name=task.name,
                     content=self._task_content(task)
                 )
-                thread = getattr(created, "thread", None)
-                if thread is None:
-                    thread = created[0] if isinstance(created, tuple) else created
+                thread = created.thread
                 self.task_to_thread[task_uuid] = str(thread.id)
                 self.thread_to_task[str(thread.id)] = task_uuid
                 self._save_mappings()

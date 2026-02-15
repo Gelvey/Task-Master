@@ -119,6 +119,7 @@ class TaskService:
             raise ValueError(f"Task with UUID '{task_uuid}' not found")
         
         task.name = new_name
+        # Keep legacy key-by-name compatibility for web/desktop variants.
         task.id = new_name
         self.db.save_tasks(self.username, tasks)
         logger.info(f"Updated task name for UUID {task_uuid} to '{new_name}'")

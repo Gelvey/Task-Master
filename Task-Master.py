@@ -286,9 +286,11 @@ class TaskManager:
         """
 
         def make_task_data(task):
+            task_uuid = getattr(task, "uuid", None) or str(uuid.uuid4())
+            task.uuid = task_uuid
             return {
                 "name": task.name,
-                "uuid": getattr(task, "uuid", str(uuid.uuid4())),
+                "uuid": task_uuid,
                 "deadline": task.deadline if hasattr(task, "deadline") else None,
                 "status": task.status if hasattr(task, "status") else "To Do",
                 "order": task.order if hasattr(task, "order") else 0,
