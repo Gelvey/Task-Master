@@ -27,10 +27,19 @@ class TaskService:
     async def get_task_by_name(self, task_name: str, owner: str = None) -> Optional[Task]:
         """Get a specific task by name (optionally filtered by owner)"""
         tasks = self.db.load_tasks(self.username)
+        normalized_name = task_name.strip().lower()
         for task in tasks:
-            if task.name == task_name:
+            if task.name.strip().lower() == normalized_name:
                 if owner is None or task.owner == owner:
                     return task
+        return None
+    
+    async def get_task_by_uuid(self, task_uuid: str) -> Optional[Task]:
+        """Get a specific task by stable UUID"""
+        tasks = self.db.load_tasks(self.username)
+        for task in tasks:
+            if task.uuid == task_uuid:
+                return task
         return None
     
     async def add_task_from_modal(self, name: str, owner: str = "", deadline: Optional[str] = None,
@@ -101,3 +110,25 @@ class TaskService:
         from .message_updater import MessageUpdater
         updater = MessageUpdater()
         await updater.update_all_task_boards()
+    
+    async def update_task_name_by_uuid(self, task_uuid: str, new_name: str):
+        """Update task name by stable UUID"""
+        tasks = self.db.load_tasks(self.username)
+        task = next((t for t in tasks if t.uuid == task_uuid), None)
+        if task is None:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+        
+        task.name = new_name
+        # Keep legacy key-by-name compatibility for web/desktop variants.
+        task.id = new_name
+        self.db.save_tasks(self.username, tasks)
+        logger.info(f"Updated task name for UUID {task_uuid} to '{new_name}'")
+    
+    async def update_task_description_by_uuid(self, task_uuid: str, description: str):
+        """Update task description by stable UUID"""
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+        
+        self.db.update_task(self.username, task.id, {'description': description or ""})
+        logger.info(f"Updated task description for UUID {task_uuid}")

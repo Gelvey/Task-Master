@@ -10,7 +10,10 @@ import asyncio
 from config.settings import Settings
 from services.message_updater import MessageUpdater
 from services.reminder_service import ReminderService
+from services.dashboard_service import DashboardService
+from services.forum_sync_service import ForumSyncService
 from discord_ui.select_menus import TaskFilterView
+from discord_ui.modals import EditDescriptionModal
 from utils.logger import setup_logging
 from database.firebase_manager import DatabaseManager
 
@@ -29,6 +32,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Services
 message_updater = MessageUpdater()
 reminder_service = ReminderService()
+dashboard_service = DashboardService()
+forum_sync_service = ForumSyncService()
 
 # Database
 db_manager = None
@@ -52,8 +57,15 @@ async def on_ready():
     reminder_service.set_bot(bot)
     reminder_service.set_database(db_manager)
     
-    # Register persistent views
-    bot.add_view(TaskFilterView())
+    dashboard_service.set_bot(bot)
+    dashboard_service.set_database(db_manager)
+    
+    forum_sync_service.set_bot(bot)
+    forum_sync_service.set_database(db_manager)
+    
+    # Register persistent views (legacy board mode only)
+    if Settings.TASK_FORUM_CHANNEL is None:
+        bot.add_view(TaskFilterView())
     
     # Sync slash commands
     try:
@@ -62,12 +74,22 @@ async def on_ready():
     except Exception as e:
         logger.error(f"Failed to sync commands: {e}")
     
-    # Initialize task boards
-    await message_updater.initialize_task_boards()
+    # Initialize messaging surfaces
+    if Settings.TASK_FORUM_CHANNEL:
+        await dashboard_service.initialize_dashboard()
+        await forum_sync_service.sync_from_database()
+    else:
+        await message_updater.initialize_task_boards()
     
     # Start background tasks
-    task_board_updater.start()
-    reminder_checker.start()
+    if Settings.TASK_FORUM_CHANNEL:
+        if not forum_sync_updater.is_running():
+            forum_sync_updater.start()
+    else:
+        if not task_board_updater.is_running():
+            task_board_updater.start()
+    if not reminder_checker.is_running():
+        reminder_checker.start()
     
     logger.info("Bot is ready!")
 
@@ -80,6 +102,18 @@ async def task_board_updater():
         logger.debug("Task boards updated")
     except Exception as e:
         logger.error(f"Error updating task boards: {e}")
+
+
+@tasks.loop(seconds=Settings.TASK_BOARD_REFRESH_INTERVAL)
+async def forum_sync_updater():
+    """Background task to keep dashboard and forum threads in sync"""
+    if not Settings.TASK_FORUM_CHANNEL:
+        return
+    try:
+        await forum_sync_service.sync_from_database()
+        await dashboard_service.update_dashboard()
+    except Exception as e:
+        logger.error(f"Error syncing forum/dashboard: {e}")
 
 
 @tasks.loop(seconds=Settings.REMINDER_CHECK_INTERVAL)
@@ -98,10 +132,46 @@ async def before_task_board_updater():
     await bot.wait_until_ready()
 
 
+@forum_sync_updater.before_loop
+async def before_forum_sync_updater():
+    """Wait until bot is ready before starting forum sync"""
+    await bot.wait_until_ready()
+
+
 @reminder_checker.before_loop
 async def before_reminder_checker():
     """Wait until bot is ready before starting reminder checker"""
     await bot.wait_until_ready()
+
+
+@bot.event
+async def on_message(message: discord.Message):
+    """Keep dashboard channel read-only (except bot messages)"""
+    if message.author.bot:
+        return
+    
+    if Settings.is_dashboard_channel(message.channel.id):
+        try:
+            await message.delete()
+        except Exception as e:
+            logger.warning(f"Failed to delete message in dashboard channel: {e}")
+
+
+@bot.event
+async def on_thread_update(before: discord.Thread, after: discord.Thread):
+    """Sync thread title edits back to task names"""
+    if not Settings.TASK_FORUM_CHANNEL:
+        return
+    
+    if after.parent_id != Settings.TASK_FORUM_CHANNEL:
+        return
+    
+    if before.name != after.name:
+        try:
+            await forum_sync_service.handle_thread_rename(after)
+            await dashboard_service.update_dashboard()
+        except Exception as e:
+            logger.error(f"Failed to sync thread rename '{before.name}' -> '{after.name}': {e}")
 
 
 # Slash Commands
@@ -176,7 +246,14 @@ async def help_command(interaction: discord.Interaction):
 @bot.tree.command(name="refresh", description="Manually refresh the task board")
 async def refresh_taskboard(interaction: discord.Interaction):
     """Command to manually refresh the task board"""
-    if interaction.channel_id not in Settings.TASK_CHANNELS:
+    if Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.defer(ephemeral=True)
+        await forum_sync_service.sync_from_database()
+        await dashboard_service.update_dashboard()
+        await interaction.followup.send("✅ Forum threads and dashboard refreshed!", ephemeral=True)
+        return
+    
+    if not Settings.is_task_channel(interaction.channel_id):
         await interaction.response.send_message(
             "❌ This channel is not configured as a task channel.", 
             ephemeral=True
@@ -192,7 +269,7 @@ async def refresh_taskboard(interaction: discord.Interaction):
 @app_commands.default_permissions(administrator=True)
 async def create_taskboard(interaction: discord.Interaction):
     """Admin command to manually create a task board in current channel"""
-    if interaction.channel_id not in Settings.TASK_CHANNELS:
+    if not Settings.is_task_channel(interaction.channel_id):
         await interaction.response.send_message(
             "❌ This channel is not configured as a task channel.", 
             ephemeral=True
@@ -202,6 +279,41 @@ async def create_taskboard(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     await message_updater.update_task_board(interaction.channel)
     await interaction.followup.send("✅ Task board created/updated!", ephemeral=True)
+
+
+@bot.tree.command(name="description", description="Edit the current task thread description")
+async def edit_description(interaction: discord.Interaction):
+    """Edit task description from within a task thread"""
+    if not Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message(
+            "❌ Forum mode is not enabled.",
+            ephemeral=True
+        )
+        return
+    
+    if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message(
+            "❌ Use this command inside a task thread in the configured forum.",
+            ephemeral=True
+        )
+        return
+    
+    task_uuid = forum_sync_service.get_task_uuid_for_thread(interaction.channel.id)
+    if not task_uuid:
+        await interaction.response.send_message("❌ This thread is not linked to a task.", ephemeral=True)
+        return
+    
+    from services.task_service import TaskService
+    task_service = TaskService()
+    task = await task_service.get_task_by_uuid(task_uuid)
+    if not task:
+        await interaction.response.send_message("❌ Linked task was not found.", ephemeral=True)
+        return
+    
+    await interaction.response.send_modal(EditDescriptionModal(
+        task_uuid=task_uuid,
+        current_description=task.description or ""
+    ))
 
 
 def main():

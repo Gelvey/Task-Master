@@ -71,7 +71,10 @@ def create_task_board_embed(tasks: List[Task], owner: str = None, filter_status:
                           f"    ↳ Status: {task.status}{deadline_str}{owner_str}{url_str}\n")
             
             if task.description:
-                desc_preview = task.description[:50] + "..." if len(task.description) > 50 else task.description
+                single_line_description = task.description.replace("\n", " ")
+                desc_preview = (single_line_description[:200] + "..."
+                                if len(single_line_description) > 200
+                                else single_line_description)
                 field_value += f"    ↳ 📝 {desc_preview}\n"
             
             field_value += "\n"

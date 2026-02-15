@@ -10,6 +10,7 @@ import json
 import configparser
 import re
 import os
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -85,6 +86,7 @@ class Task:
     def __init__(
         self,
         name,
+        uuid_value=None,
         deadline=None,
         status="To Do",
         order=0,
@@ -94,6 +96,7 @@ class Task:
         colour="default",
     ):
         self.name = name
+        self.uuid = uuid_value or str(uuid.uuid4())
         self.deadline = deadline  # Can be None
         self.status = status
         self.order = order
@@ -261,6 +264,7 @@ class TaskManager:
             for task_id, task_data in tasks_data.items():
                 task = Task(
                     name=task_data.get("name", task_id),
+                    uuid_value=task_data.get("uuid"),
                     deadline=task_data.get("deadline"),
                     status=task_data.get("status", "To Do"),
                     order=int(task_data.get("order", 0)),
@@ -282,8 +286,11 @@ class TaskManager:
         """
 
         def make_task_data(task):
+            task_uuid = getattr(task, "uuid", None) or str(uuid.uuid4())
+            task.uuid = task_uuid
             return {
                 "name": task.name,
+                "uuid": task_uuid,
                 "deadline": task.deadline if hasattr(task, "deadline") else None,
                 "status": task.status if hasattr(task, "status") else "To Do",
                 "order": task.order if hasattr(task, "order") else 0,

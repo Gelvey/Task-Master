@@ -1,9 +1,10 @@
 """
 Task data model matching the Task-Master schema
 """
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field
 from typing import Optional
 from datetime import datetime
+import uuid
 
 
 @dataclass
@@ -11,6 +12,7 @@ class Task:
     """Task model matching Task-Master structure"""
     name: str
     id: Optional[str] = None
+    uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     deadline: Optional[str] = None  # ISO format string or None
     status: str = "To Do"
     order: int = 0
@@ -23,6 +25,7 @@ class Task:
         """Convert task to dictionary for database storage"""
         return {
             'name': self.name,
+            'uuid': self.uuid,
             'deadline': self.deadline,
             'status': self.status,
             'order': self.order,
@@ -35,8 +38,10 @@ class Task:
     @classmethod
     def from_dict(cls, data: dict, task_id: str = None):
         """Create Task from database dictionary"""
+        task_uuid = data.get('uuid') or str(uuid.uuid4())
         return cls(
             id=task_id or data.get('id', data.get('name')),
+            uuid=task_uuid,
             name=data.get('name', ''),
             deadline=data.get('deadline'),
             status=data.get('status', 'To Do'),
