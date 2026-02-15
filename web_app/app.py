@@ -10,6 +10,7 @@ import logging
 import os
 import json
 import socket
+import uuid
 from functools import wraps
 from dotenv import load_dotenv
 
@@ -158,6 +159,7 @@ def get_local_file_path(username):
 def load_tasks(username):
     """Load tasks from Firebase or local storage"""
     tasks = []
+    migrated_missing_uuid = False
     
     if USE_FIREBASE:
         try:
@@ -166,6 +168,9 @@ def load_tasks(username):
             if tasks_data:
                 for task_id, task_data in tasks_data.items():
                     task_data['id'] = task_id
+                    if not task_data.get('uuid'):
+                        task_data['uuid'] = str(uuid.uuid4())
+                        migrated_missing_uuid = True
                     tasks.append(task_data)
         except Exception as e:
             logger.error(f"Failed to load tasks from Firebase: {e}")
@@ -179,12 +184,23 @@ def load_tasks(username):
                     if tasks_data:
                         for task_id, task_data in tasks_data.items():
                             task_data['id'] = task_id
+                            if not task_data.get('uuid'):
+                                task_data['uuid'] = str(uuid.uuid4())
+                                migrated_missing_uuid = True
                             tasks.append(task_data)
             except Exception as e:
                 logger.error(f"Failed to read local tasks file: {e}")
     
     # Sort tasks by order
     tasks.sort(key=lambda x: x.get('order', 0))
+    
+    # Backfill UUIDs without changing existing task keys/IDs.
+    if migrated_missing_uuid and tasks:
+        try:
+            save_tasks(username, tasks)
+        except Exception as e:
+            logger.warning(f"Failed UUID backfill for {username}: {e}")
+    
     return tasks
 
 
@@ -195,6 +211,7 @@ def save_tasks(username, tasks):
         task_id = task.get('id', task['name'])
         tasks_data[task_id] = {
             'name': task['name'],
+            'uuid': task.get('uuid'),
             'deadline': task.get('deadline'),
             'status': task.get('status', 'To Do'),
             'order': task.get('order', 0),
@@ -326,6 +343,7 @@ def create_task():
         # Create new task
         new_task = {
             'id': data['name'],
+            'uuid': str(uuid.uuid4()),
             'name': data['name'],
             'deadline': data.get('deadline'),
             'status': data.get('status', 'To Do'),
@@ -359,6 +377,7 @@ def update_task(task_id):
             if task['id'] == task_id:
                 task.update({
                     'name': data.get('name', task['name']),
+                    'uuid': task.get('uuid', str(uuid.uuid4())),
                     'deadline': data.get('deadline', task.get('deadline')),
                     'status': data.get('status', task['status']),
                     'description': data.get('description', task.get('description', '')),

@@ -106,6 +106,7 @@ class DatabaseManager:
     def load_tasks(self, username: str) -> List[Task]:
         """Load all tasks for a user"""
         tasks = []
+        migrated_missing_uuid = False
         
         if self.use_firebase:
             try:
@@ -114,6 +115,8 @@ class DatabaseManager:
                 if tasks_data:
                     for task_id, task_data in tasks_data.items():
                         task = Task.from_dict(task_data, task_id)
+                        if not task_data.get("uuid"):
+                            migrated_missing_uuid = True
                         tasks.append(task)
             except Exception as e:
                 logger.error(f"Failed to load tasks from Firebase: {e}")
@@ -127,12 +130,22 @@ class DatabaseManager:
                         if tasks_data:
                             for task_id, task_data in tasks_data.items():
                                 task = Task.from_dict(task_data, task_id)
+                                if not task_data.get("uuid"):
+                                    migrated_missing_uuid = True
                                 tasks.append(task)
                 except Exception as e:
                     logger.error(f"Failed to read local tasks file: {e}")
         
         # Sort by order
         tasks.sort(key=lambda x: x.order)
+        
+        # Backfill missing UUIDs without changing task IDs/keys (compatibility-safe migration).
+        if migrated_missing_uuid and tasks:
+            try:
+                self.save_tasks(username, tasks)
+                logger.info(f"Backfilled UUIDs for existing tasks of user {username}")
+            except Exception as e:
+                logger.warning(f"Failed UUID backfill for user {username}: {e}")
         return tasks
     
     def save_tasks(self, username: str, tasks: List[Task]):
@@ -165,7 +178,7 @@ class DatabaseManager:
         """Add a new task"""
         tasks = self.load_tasks(username)
         task.order = len(tasks)
-        task.id = task.name  # Use name as ID
+        task.id = task.name  # Keep name-keyed compatibility for existing app variants
         tasks.append(task)
         self.save_tasks(username, tasks)
         logger.info(f"Added task '{task.name}' for user {username}")
@@ -283,3 +296,18 @@ class DatabaseManager:
             except Exception as e:
                 logger.error(f"Failed to save bot metadata file: {e}")
                 raise
+    
+    def get_task_thread_mappings(self) -> Dict[str, Dict[str, str]]:
+        """Get task<->thread mappings for forum sync"""
+        data = self.get_bot_metadata("task_forum_mappings") or {}
+        return {
+            "task_to_thread": data.get("task_to_thread", {}),
+            "thread_to_task": data.get("thread_to_task", {}),
+        }
+    
+    def save_task_thread_mappings(self, task_to_thread: Dict[str, str], thread_to_task: Dict[str, str]):
+        """Persist task<->thread mappings for forum sync"""
+        self.save_bot_metadata("task_forum_mappings", {
+            "task_to_thread": task_to_thread,
+            "thread_to_task": thread_to_task,
+        })

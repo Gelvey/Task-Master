@@ -17,6 +17,8 @@ class Settings:
     
     # Discord settings
     DISCORD_BOT_TOKEN: str = os.getenv("DISCORD_BOT_TOKEN", "")
+    DASHBOARD_CHANNEL: Optional[int] = None
+    TASK_FORUM_CHANNEL: Optional[int] = None
     TASK_CHANNEL: Optional[int] = None
     TASK_CHANNELS: List[int] = []
     REMINDER_CHANNEL: int = None
@@ -69,6 +71,26 @@ class Settings:
                     cls.TASK_CHANNEL = None
                     cls.TASK_CHANNELS = []
         
+        # Parse dashboard/forum channels for forum-based architecture
+        dashboard_channel_str = os.getenv("DASHBOARD_CHANNEL", "").strip()
+        if dashboard_channel_str:
+            try:
+                cls.DASHBOARD_CHANNEL = int(dashboard_channel_str)
+            except ValueError:
+                logger.error("Invalid DASHBOARD_CHANNEL format. Use a single channel ID.")
+                cls.DASHBOARD_CHANNEL = None
+        else:
+            # Backward compatible fallback
+            cls.DASHBOARD_CHANNEL = cls.TASK_CHANNEL
+        
+        task_forum_channel_str = os.getenv("TASK_FORUM_CHANNEL", "").strip()
+        if task_forum_channel_str:
+            try:
+                cls.TASK_FORUM_CHANNEL = int(task_forum_channel_str)
+            except ValueError:
+                logger.error("Invalid TASK_FORUM_CHANNEL format. Use a single forum channel ID.")
+                cls.TASK_FORUM_CHANNEL = None
+        
         # Parse owners
         owners_str = os.getenv("OWNERS", "")
         if owners_str:
@@ -115,6 +137,16 @@ class Settings:
     def is_task_channel(cls, channel_id: int) -> bool:
         """Check if a channel is the configured task channel"""
         return cls.TASK_CHANNEL is not None and channel_id == cls.TASK_CHANNEL
+    
+    @classmethod
+    def is_dashboard_channel(cls, channel_id: int) -> bool:
+        """Check if a channel is the configured dashboard channel"""
+        return cls.DASHBOARD_CHANNEL is not None and channel_id == cls.DASHBOARD_CHANNEL
+    
+    @classmethod
+    def is_task_forum_channel(cls, channel_id: int) -> bool:
+        """Check if a channel is the configured task forum channel"""
+        return cls.TASK_FORUM_CHANNEL is not None and channel_id == cls.TASK_FORUM_CHANNEL
     
     @classmethod
     def get_owner_for_user(cls, discord_user_id: int) -> str:

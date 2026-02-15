@@ -244,3 +244,32 @@ class SelectTaskModal(ui.Modal, title="Select Task"):
                 f"❌ Error: {str(e)}",
                 ephemeral=True
             )
+
+
+class EditDescriptionModal(ui.Modal, title="Edit Task Description"):
+    """Modal for editing description inside a task thread"""
+
+    def __init__(self, task_uuid: str, current_description: str):
+        super().__init__()
+        self.task_uuid = task_uuid
+        self.description = ui.TextInput(
+            label="Description",
+            default=current_description or "",
+            required=False,
+            style=discord.TextStyle.paragraph,
+            max_length=1000
+        )
+        self.add_item(self.description)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from services.task_service import TaskService
+        task_service = TaskService()
+
+        try:
+            await task_service.update_task_description_by_uuid(
+                self.task_uuid,
+                self.description.value if self.description.value is not None else ""
+            )
+            await interaction.response.send_message("✅ Description updated.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error updating description: {str(e)}", ephemeral=True)
