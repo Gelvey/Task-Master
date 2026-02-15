@@ -71,7 +71,7 @@ class MessageUpdater:
                     logger.warning(f"Channel {channel_id} not found")
                     continue
                 
-                # Reuse existing message if present; create only if missing/deleted.
+                # update_task_board handles both message reuse (edit) and creation.
                 await self.update_task_board(channel)
                 logger.info(f"Initialized task board in channel {channel_id}")
             except Exception as e:

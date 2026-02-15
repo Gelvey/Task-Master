@@ -62,7 +62,8 @@ class Settings:
                         cls.TASK_CHANNEL = parsed_channels[0]
                         cls.TASK_CHANNELS = [cls.TASK_CHANNEL]
                         if len(parsed_channels) > 1:
-                            logger.warning("Multiple TASK_CHANNELS provided; only the first channel will be used.")
+                            logger.warning("Multiple TASK_CHANNELS provided; only the first channel will be used. "
+                                           "TASK_CHANNELS is deprecated, use TASK_CHANNEL.")
                 except ValueError:
                     logger.error("Invalid TASK_CHANNELS format. Use comma-separated channel IDs.")
                     cls.TASK_CHANNEL = None
