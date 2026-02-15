@@ -27,8 +27,9 @@ class TaskService:
     async def get_task_by_name(self, task_name: str, owner: str = None) -> Optional[Task]:
         """Get a specific task by name (optionally filtered by owner)"""
         tasks = self.db.load_tasks(self.username)
+        normalized_name = task_name.strip().lower()
         for task in tasks:
-            if task.name == task_name:
+            if task.name.strip().lower() == normalized_name:
                 if owner is None or task.owner == owner:
                     return task
         return None

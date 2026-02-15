@@ -185,7 +185,7 @@ class SelectTaskModal(ui.Modal, title="Select Task"):
         
         self.task_name = ui.TextInput(
             label="Enter Task Name",
-            placeholder="Type the exact task name...",
+            placeholder="Type task name (case-insensitive)...",
             required=True,
             max_length=100
         )

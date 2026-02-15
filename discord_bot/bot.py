@@ -176,7 +176,7 @@ async def help_command(interaction: discord.Interaction):
 @bot.tree.command(name="refresh", description="Manually refresh the task board")
 async def refresh_taskboard(interaction: discord.Interaction):
     """Command to manually refresh the task board"""
-    if interaction.channel_id not in Settings.TASK_CHANNELS:
+    if not Settings.is_task_channel(interaction.channel_id):
         await interaction.response.send_message(
             "❌ This channel is not configured as a task channel.", 
             ephemeral=True
@@ -192,7 +192,7 @@ async def refresh_taskboard(interaction: discord.Interaction):
 @app_commands.default_permissions(administrator=True)
 async def create_taskboard(interaction: discord.Interaction):
     """Admin command to manually create a task board in current channel"""
-    if interaction.channel_id not in Settings.TASK_CHANNELS:
+    if not Settings.is_task_channel(interaction.channel_id):
         await interaction.response.send_message(
             "❌ This channel is not configured as a task channel.", 
             ephemeral=True

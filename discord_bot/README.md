@@ -73,7 +73,7 @@ pip install -r requirements.txt
    - `DISCORD_BOT_TOKEN`: Your Discord bot token
    - `TASKMASTER_USERNAME`: Global username for database access (e.g., "gelvey")
    - `OWNERS`: Space-separated list of possible task assignees (e.g., "Circuit Gelvey")
-   - `TASK_CHANNELS`: Channel IDs where task boards will display (comma-separated)
+   - `TASK_CHANNEL`: Channel ID where the task board will display
    - `REMINDER_CHANNEL`: Channel ID for deadline reminders
    - `DISCORD_USER_*`: Map Discord user IDs to owners from OWNERS list
    - Firebase credentials (see below)
@@ -227,7 +227,7 @@ discord_bot/
 ### Bot doesn't respond
 
 - Check bot has required permissions in the channel
-- Verify `TASK_CHANNELS` includes the channel ID
+- Verify `TASK_CHANNEL` matches the channel ID
 - Check bot is online (green status in Discord)
 - Review logs in `discord_bot.log`
 

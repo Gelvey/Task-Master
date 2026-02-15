@@ -60,29 +60,19 @@ class MessageUpdater:
             logger.error("Bot not set in MessageUpdater")
             return
         
-        for channel_id in Settings.TASK_CHANNELS:
+        if Settings.TASK_CHANNEL is None:
+            logger.warning("TASK_CHANNEL is not configured. Skipping task board initialization.")
+            return
+        
+        for channel_id in [Settings.TASK_CHANNEL]:
             try:
                 channel = self._bot.get_channel(channel_id)
                 if not channel:
                     logger.warning(f"Channel {channel_id} not found")
                     continue
                 
-                # Create initial task board message
-                from services.task_service import TaskService
-                task_service = TaskService()
-                
-                # Get all tasks
-                all_tasks = task_service.get_all_tasks()
-                
-                embed = create_task_board_embed(all_tasks)
-                
-                # Create view with buttons and filters
-                view = TaskFilterView()
-                
-                message = await channel.send(embed=embed, view=view)
-                self.task_board_messages[channel_id] = message.id
-                self._save_message_ids()
-                
+                # Reuse existing message if present; create only if missing/deleted.
+                await self.update_task_board(channel)
                 logger.info(f"Initialized task board in channel {channel_id}")
             except Exception as e:
                 logger.error(f"Failed to initialize task board in channel {channel_id}: {e}")
@@ -128,7 +118,10 @@ class MessageUpdater:
             logger.error("Bot not set in MessageUpdater")
             return
         
-        for channel_id in Settings.TASK_CHANNELS:
+        if Settings.TASK_CHANNEL is None:
+            return
+        
+        for channel_id in [Settings.TASK_CHANNEL]:
             try:
                 channel = self._bot.get_channel(channel_id)
                 if not channel:
