@@ -20,6 +20,7 @@ class Task:
     url: str = ""
     owner: str = ""
     colour: str = "default"  # Priority: default, Important, Moderately Important, Not Important
+    subtasks: list = field(default_factory=list)  # List of subtask dictionaries
     
     def to_dict(self):
         """Convert task to dictionary for database storage"""
@@ -32,7 +33,8 @@ class Task:
             'description': self.description,
             'url': self.url,
             'owner': self.owner,
-            'colour': self.colour
+            'colour': self.colour,
+            'subtasks': self.subtasks
         }
     
     @classmethod
@@ -49,7 +51,8 @@ class Task:
             description=data.get('description', ''),
             url=data.get('url', ''),
             owner=data.get('owner', ''),
-            colour=data.get('colour', 'default')
+            colour=data.get('colour', 'default'),
+            subtasks=data.get('subtasks', [])
         )
     
     @property
@@ -95,6 +98,24 @@ class Task:
             "Complete": "✅"
         }
         return status_map.get(self.status, "❓")
+    
+    @property
+    def progress_percentage(self) -> int:
+        """Calculate progress percentage based on completed subtasks"""
+        if not self.subtasks:
+            return 0
+        completed = sum(1 for st in self.subtasks if st.get('completed', False))
+        return int((completed / len(self.subtasks)) * 100) if self.subtasks else 0
+    
+    def progress_bar(self, width: int = 10) -> str:
+        """Generate a text-based progress bar"""
+        if not self.subtasks:
+            return ""
+        percentage = self.progress_percentage
+        filled = int((percentage / 100) * width)
+        empty = width - filled
+        bar = "█" * filled + "░" * empty
+        return f"[{bar}] {percentage}%"
 
 
 # Priority/Color options

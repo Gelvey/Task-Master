@@ -221,6 +221,7 @@ def save_tasks(username, tasks):
             'url': task.get('url', ''),
             'owner': task.get('owner', ''),
             'colour': task.get('colour', 'default'),
+            'subtasks': task.get('subtasks', []),
         }
     
     if USE_FIREBASE:
@@ -354,6 +355,7 @@ def create_task():
             'url': data.get('url', ''),
             'owner': data.get('owner', ''),
             'colour': data.get('colour', 'default'),
+            'subtasks': data.get('subtasks', []),
         }
         
         tasks.append(new_task)
@@ -386,6 +388,7 @@ def update_task(task_id):
                     'url': data.get('url', task.get('url', '')),
                     'owner': data.get('owner', task.get('owner', '')),
                     'colour': data.get('colour', task.get('colour', 'default')),
+                    'subtasks': data.get('subtasks', task.get('subtasks', [])),
                 })
                 break
         

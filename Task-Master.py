@@ -94,6 +94,7 @@ class Task:
         url="",
         owner="",
         colour="default",
+        subtasks=None,
     ):
         self.name = name
         self.uuid = uuid_value or str(uuid.uuid4())
@@ -104,6 +105,14 @@ class Task:
         self.url = url
         self.owner = owner
         self.colour = colour
+        self.subtasks = subtasks if subtasks is not None else []
+    
+    def progress_percentage(self):
+        """Calculate progress percentage based on completed subtasks"""
+        if not self.subtasks:
+            return 0
+        completed = sum(1 for st in self.subtasks if st.get('completed', False))
+        return int((completed / len(self.subtasks)) * 100) if self.subtasks else 0
 
 
 class LoginScreen(tk.Tk):
@@ -272,6 +281,7 @@ class TaskManager:
                     url=task_data.get("url", ""),
                     owner=task_data.get("owner", ""),
                     colour=task_data.get("colour", "default"),
+                    subtasks=task_data.get("subtasks", []),
                 )
                 tasks.append(task)
 
@@ -298,6 +308,7 @@ class TaskManager:
                 "url": getattr(task, "url", ""),
                 "colour": getattr(task, "colour", "default"),
                 "owner": getattr(task, "owner", ""),
+                "subtasks": getattr(task, "subtasks", []),
             }
 
         if task_to_update is not None:
