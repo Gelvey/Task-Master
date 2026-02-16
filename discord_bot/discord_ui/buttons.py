@@ -60,3 +60,42 @@ class ConfirmationButtons(View):
         self.value = False
         await interaction.response.defer()
         self.stop()
+
+
+class SubtaskManagementButtons(View):
+    """Buttons for managing subtasks in forum threads"""
+    
+    def __init__(self, task_uuid: str):
+        super().__init__(timeout=None)  # Persistent view
+        self.task_uuid = task_uuid
+    
+    @discord.ui.button(label="➕ Add Sub-task", style=discord.ButtonStyle.success, custom_id="add_subtask")
+    async def add_subtask_button(self, interaction: discord.Interaction, button: Button):
+        """Button to add a new subtask"""
+        from .modals import AddSubtaskModal
+        await interaction.response.send_modal(AddSubtaskModal(self.task_uuid))
+
+
+class SubtaskToggleButton(Button):
+    """Button to toggle a specific subtask"""
+    
+    def __init__(self, task_uuid: str, subtask_index: int, subtask_name: str, is_completed: bool):
+        checkbox = "☑" if is_completed else "☐"
+        label = f"{checkbox} {subtask_name}"
+        super().__init__(
+            label=label[:80],  # Discord button label limit
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"toggle_subtask_{task_uuid}_{subtask_index}"
+        )
+        self.task_uuid = task_uuid
+        self.subtask_index = subtask_index
+    
+    async def callback(self, interaction: discord.Interaction):
+        from services.task_service import TaskService
+        task_service = TaskService()
+        
+        try:
+            await task_service.toggle_subtask(self.task_uuid, self.subtask_index)
+            await interaction.response.send_message("✅ Sub-task toggled!", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
