@@ -35,6 +35,58 @@ forum_sync_service = ForumSyncService()
 
 # Database
 db_manager = None
+status_index = 0
+
+
+def _build_status_messages(tasks_data):
+    """Build rotating bot status lines from task data."""
+    total = len(tasks_data)
+    todo = sum(1 for t in tasks_data if getattr(t, "status", "") == "To Do")
+    in_progress = sum(1 for t in tasks_data if getattr(
+        t, "status", "") == "In Progress")
+    complete = sum(1 for t in tasks_data if getattr(
+        t, "status", "") == "Complete")
+    critical = sum(1 for t in tasks_data if getattr(
+        t, "colour", "") == "Important")
+
+    if total == 0:
+        return [
+            "🧠 planning world domination",
+            "✨ waiting for the first task",
+        ]
+
+    return [
+        f"📋 {todo} To Do • 🔄 {in_progress} In Progress",
+        f"✅ {complete}/{total} complete",
+        f"🔥 {critical} critical on top",
+    ]
+
+
+async def refresh_bot_presence():
+    """Refresh bot presence from current task state."""
+    global status_index
+
+    if not db_manager:
+        return
+
+    try:
+        task_data = db_manager.load_tasks(Settings.TASKMASTER_USERNAME)
+        status_messages = _build_status_messages(task_data)
+        if not status_messages:
+            status_messages = ["Task-Master online"]
+
+        next_status = status_messages[status_index % len(status_messages)]
+        status_index += 1
+
+        await bot.change_presence(
+            status=discord.Status.online,
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name=next_status,
+            ),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to refresh bot presence: {e}")
 
 
 @bot.event
@@ -74,6 +126,10 @@ async def on_ready():
         forum_sync_updater.start()
     if not reminder_checker.is_running():
         reminder_checker.start()
+    if Settings.BOT_STATUS_ENABLED and not status_updater.is_running():
+        status_updater.start()
+
+    await refresh_bot_presence()
 
     logger.info("Bot is ready!")
 
@@ -100,6 +156,18 @@ async def reminder_checker():
         logger.error(f"Error checking reminders: {e}")
 
 
+@tasks.loop(seconds=Settings.BOT_STATUS_REFRESH_INTERVAL)
+async def status_updater():
+    """Background task to keep bot presence fresh and informative"""
+    if not Settings.BOT_STATUS_ENABLED:
+        return
+
+    try:
+        await refresh_bot_presence()
+    except Exception as e:
+        logger.error(f"Error updating bot status: {e}")
+
+
 @forum_sync_updater.before_loop
 async def before_forum_sync_updater():
     """Wait until bot is ready before starting forum sync"""
@@ -109,6 +177,12 @@ async def before_forum_sync_updater():
 @reminder_checker.before_loop
 async def before_reminder_checker():
     """Wait until bot is ready before starting reminder checker"""
+    await bot.wait_until_ready()
+
+
+@status_updater.before_loop
+async def before_status_updater():
+    """Wait until bot is ready before updating presence"""
     await bot.wait_until_ready()
 
 

@@ -8,8 +8,10 @@ Discord bot integration for Task-Master task management system. Provides full ta
 - **Thread Configure Modal**: Configure status, priority, owner, deadline, description, and URL in one submit
 - **Sub-task Upsert Command**: Use `/subtask <id>` in a task thread to create or edit sub-task details
 - **Priority Levels**: Support for Important, Moderately Important, Not Important priorities
+- **Priority-First Forum Sync**: Important tasks are treated as critical and pinned to the top of the forum
 - **Deadline Reminders**: Automatic notifications for upcoming deadlines (24-hour warning)
 - **Overdue Alerts**: Daily notifications for overdue tasks
+- **Dynamic Bot Status**: Rotating Discord presence with live task stats
 - **Multi-User Support**: Maps Discord users to Task-Master owners via environment variables
 - **Shared Database**: Uses same Firebase/local JSON backend as web app and desktop client
 - **Persistent Storage**: Message IDs and reminder tracking stored in database (survives bot restarts)
@@ -75,6 +77,8 @@ pip install -r requirements.txt
    - `TASK_FORUM_CHANNEL`: Forum channel ID used for one-thread-per-task sync
    - `DASHBOARD_CHANNEL`: Read-only dashboard channel for sync/task counts (optional but recommended)
    - `REMINDER_CHANNEL`: Channel ID for deadline reminders
+   - `BOT_STATUS_ENABLED`: Enable/disable rotating bot presence
+   - `BOT_STATUS_REFRESH_INTERVAL`: Seconds between status updates
    - `DISCORD_USER_*`: Map Discord user IDs to owners from OWNERS list
    - Firebase credentials (see below)
 
@@ -138,6 +142,7 @@ python bot.py
 The bot should now:
 - Connect to Discord
 - Initialize the forum thread sync and dashboard
+- Pin Important (critical) forum posts to keep them at the top
 - Sync slash commands
 - Load persisted message IDs and reminder tracking from database
 - Start listening for interactions
@@ -175,6 +180,15 @@ Sub-task IDs are stable numeric identifiers shared across clients.
 ### Reminders
 
 The bot automatically checks for tasks with deadlines approaching within 24 hours and sends reminders to the configured reminder channel, mentioning the task owner.
+
+### Bot Status
+
+The bot rotates a "watching" status with live task data, for example:
+- `📋 X To Do • 🔄 Y In Progress`
+- `✅ Z/N complete`
+- `🔥 C critical on top`
+
+Set `BOT_STATUS_ENABLED=false` to disable this behavior.
 
 ## Commands
 
@@ -230,6 +244,7 @@ discord_bot/
 ### Forum/dashboard not updating
 
 - Check bot has "Send Messages" and "Embed Links" permissions
+- For critical pinning, also grant "Manage Threads"
 - Verify `TASK_FORUM_CHANNEL` points to a forum channel
 - Try `/refresh` command to force sync
 - Check `FORUM_SYNC_REFRESH_INTERVAL` setting

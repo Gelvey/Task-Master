@@ -40,6 +40,10 @@ class Settings:
     )
     REMINDER_CHECK_INTERVAL: int = int(
         os.getenv("REMINDER_CHECK_INTERVAL", "300"))
+    BOT_STATUS_REFRESH_INTERVAL: int = int(
+        os.getenv("BOT_STATUS_REFRESH_INTERVAL", "90"))
+    BOT_STATUS_ENABLED: bool = os.getenv(
+        "BOT_STATUS_ENABLED", "true").lower() == "true"
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -112,6 +116,11 @@ class Settings:
         if not cls.FIREBASE_DATABASE_URL and not cls.USE_LOCAL_STORAGE:
             logger.warning(
                 "No FIREBASE_DATABASE_URL and USE_LOCAL_STORAGE=false. Bot may not persist data.")
+
+        if cls.BOT_STATUS_REFRESH_INTERVAL <= 0:
+            logger.warning(
+                "BOT_STATUS_REFRESH_INTERVAL must be > 0. Falling back to 90 seconds.")
+            cls.BOT_STATUS_REFRESH_INTERVAL = 90
 
         logger.info(f"Loaded settings: username='{cls.TASKMASTER_USERNAME}', "
                     f"{len(cls.OWNERS)} owners, {len(cls.USER_MAPPING)} user mappings")

@@ -84,10 +84,51 @@ class ForumSyncService:
         "default": "⚪"
     }
 
+    PRIORITY_SORT_ORDER = {
+        "Important": 0,
+        "Moderately Important": 1,
+        "Not Important": 2,
+        "default": 3,
+    }
+
+    STATUS_SORT_ORDER = {
+        "In Progress": 0,
+        "To Do": 1,
+        "Complete": 2,
+    }
+
     def _get_thread_name_with_priority(self, task):
         """Generate thread name with priority emoji prefix"""
         emoji = self.PRIORITY_EMOJIS.get(task.colour, "⚪")
         return f"{emoji} {task.name}"
+
+    def _task_sort_key(self, task):
+        """Sort key for forum sync ordering: critical first, then active work."""
+        priority_rank = self.PRIORITY_SORT_ORDER.get(task.colour, 99)
+        status_rank = self.STATUS_SORT_ORDER.get(task.status, 99)
+        return (priority_rank, status_rank, task.order, task.name.lower())
+
+    def _is_thread_pinned(self, thread: discord.Thread) -> bool:
+        """Safely determine if a forum thread is currently pinned."""
+        try:
+            return bool(thread.flags and thread.flags.pinned)
+        except Exception:
+            return False
+
+    async def _pin_state_sync(self, thread: discord.Thread, should_pin: bool):
+        """Pin/unpin thread when needed to keep critical tasks at top."""
+        is_pinned = self._is_thread_pinned(thread)
+        if is_pinned == should_pin:
+            return
+
+        try:
+            await thread.edit(pinned=should_pin)
+        except discord.Forbidden:
+            logger.warning(
+                "Missing permission to pin/unpin forum posts. Grant Manage Threads to enable priority pinning.")
+        except Exception as e:
+            logger.warning(
+                f"Failed to update pin state for thread {thread.id}: {e}")
 
     async def sync_from_database(self):
         if not self._bot or Settings.TASK_FORUM_CHANNEL is None:
@@ -102,6 +143,7 @@ class ForumSyncService:
         from services.task_service import TaskService
         task_service = TaskService()
         tasks = task_service.get_all_tasks()
+        tasks = sorted(tasks, key=self._task_sort_key)
 
         for task in tasks:
             # Keep migration-safe fallback for legacy tasks while UUID backfill propagates.
@@ -137,6 +179,7 @@ class ForumSyncService:
                     content=self._task_content(task)
                 )
                 thread = created.thread
+                await self._pin_state_sync(thread, task.colour == "Important")
                 self.task_to_thread[task_uuid] = str(thread.id)
                 self.thread_to_task[str(thread.id)] = task_uuid
                 self._save_mappings()
@@ -145,8 +188,19 @@ class ForumSyncService:
                 continue
 
             thread_name = self._get_thread_name_with_priority(task)
-            if thread.name != thread_name:
-                await thread.edit(name=thread_name)
+            should_pin = task.colour == "Important"
+            if thread.name != thread_name or self._is_thread_pinned(thread) != should_pin:
+                try:
+                    await thread.edit(name=thread_name, pinned=should_pin)
+                except TypeError:
+                    await thread.edit(name=thread_name)
+                    await self._pin_state_sync(thread, should_pin)
+                except discord.Forbidden:
+                    logger.warning(
+                        "Missing permission to rename/pin forum posts. Grant Manage Threads to fully sync priority ordering.")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to update thread metadata for {thread.id}: {e}")
 
             # Keep latest task snapshot in thread starter message where possible
             content = self._task_content(task)

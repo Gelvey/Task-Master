@@ -87,6 +87,18 @@ def validate_priority(priority: str) -> str:
 
     priority = priority.strip()
 
+    aliases = {
+        "critical": "Important",
+        "high": "Important",
+        "medium": "Moderately Important",
+        "low": "Not Important",
+        "normal": "default",
+    }
+
+    mapped = aliases.get(priority.lower())
+    if mapped:
+        return mapped
+
     if priority in valid_priorities:
         return priority
 
