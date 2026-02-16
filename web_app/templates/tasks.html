@@ -18,10 +18,9 @@
             <div class="form-row">
                 <div class="form-group flex-2">
                     <label for="taskName">Task Name:</label>
-                    <input type="text" id="taskName" class="form-control" 
-                           placeholder="Enter task name" required>
+                    <input type="text" id="taskName" class="form-control" placeholder="Enter task name" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="taskStatus">Status:</label>
                     <select id="taskStatus" class="form-control">
@@ -31,25 +30,25 @@
                     </select>
                 </div>
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group">
                     <label>
                         <input type="checkbox" id="hasDeadline"> Has Deadline
                     </label>
                 </div>
-                
+
                 <div class="form-group deadline-inputs" style="display: none;">
                     <label for="deadlineDate">Deadline Date:</label>
                     <input type="date" id="deadlineDate" class="form-control">
                 </div>
-                
+
                 <div class="form-group deadline-inputs" style="display: none;">
                     <label for="deadlineTime">Deadline Time:</label>
                     <input type="time" id="deadlineTime" class="form-control">
                 </div>
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="taskColour">Priority:</label>
@@ -59,7 +58,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                
+
                 {% if owners %}
                 <div class="form-group">
                     <label for="taskOwner">Owner:</label>
@@ -72,52 +71,55 @@
                 </div>
                 {% endif %}
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group flex-1">
                     <label for="taskDescription">Description:</label>
-                    <textarea id="taskDescription" class="form-control" rows="2" 
-                              placeholder="Task description (optional)"></textarea>
+                    <textarea id="taskDescription" class="form-control" rows="2"
+                        placeholder="Task description (optional)"></textarea>
                 </div>
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group flex-1">
                     <label for="taskUrl">URL:</label>
-                    <input type="url" id="taskUrl" class="form-control" 
-                           placeholder="https://example.com (optional)">
+                    <input type="url" id="taskUrl" class="form-control" placeholder="https://example.com (optional)">
                 </div>
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group flex-1">
                     <label>Sub-tasks:</label>
                     <div id="subtasksList" class="subtasks-editor"></div>
                     <div class="subtask-add-control">
-                        <input type="text" id="newSubtask" class="form-control" 
-                               placeholder="Add a sub-task" />
+                        <input type="text" id="newSubtask" class="form-control" placeholder="Add a sub-task" />
+                        <input type="text" id="newSubtaskDescription" class="form-control"
+                            placeholder="Sub-task description (optional)" />
+                        <input type="url" id="newSubtaskUrl" class="form-control"
+                            placeholder="https://example.com (optional)" />
                         <button type="button" id="addSubtaskBtn" class="btn btn-sm btn-secondary">Add</button>
                     </div>
                 </div>
             </div>
-            
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add Task</button>
-                <button type="button" id="cancelEdit" class="btn btn-secondary" style="display: none;">Cancel Edit</button>
+                <button type="button" id="cancelEdit" class="btn btn-secondary" style="display: none;">Cancel
+                    Edit</button>
             </div>
         </form>
     </div>
 
     <div class="task-list-section">
         <h2>Your Tasks</h2>
-        
+
         <div class="filter-buttons">
             <button class="btn btn-sm filter-btn active" data-filter="all">All</button>
             <button class="btn btn-sm filter-btn" data-filter="To Do">To Do</button>
             <button class="btn btn-sm filter-btn" data-filter="In Progress">In Progress</button>
             <button class="btn btn-sm filter-btn" data-filter="Complete">Complete</button>
         </div>
-        
+
         <div id="taskList" class="task-list">
             <p class="loading">Loading tasks...</p>
         </div>
@@ -137,11 +139,11 @@
             <p><strong>Description:</strong></p>
             <p id="modalDescription" class="description-text"></p>
             <p><strong>URL:</strong> <a id="modalUrl" href="#" target="_blank"></a></p>
-            
+
             <div id="modalSubtasks" style="display: none;">
                 <p><strong>Sub-tasks:</strong></p>
             </div>
-            
+
             <div class="modal-actions">
                 <button class="btn btn-primary" id="editTaskBtn">Edit</button>
                 <button class="btn btn-danger" id="deleteTaskBtn">Delete</button>

@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from tkcalendar import DateEntry
 from datetime import datetime, timedelta
 import logging
@@ -19,7 +19,8 @@ load_dotenv()
 OWNERS = os.getenv("OWNERS", "").split()
 
 # Configure logging early so initialization messages are recorded
-logging.basicConfig(filename="Task-Master.log", level=logging.INFO, filemode="a")
+logging.basicConfig(filename="Task-Master.log",
+                    level=logging.INFO, filemode="a")
 
 # Firebase configuration with local fallback
 FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
@@ -28,11 +29,13 @@ try:
     cred_path = "credentials.json"
     if FIREBASE_DATABASE_URL and os.path.isfile(cred_path):
         cred = credentials.Certificate(cred_path)
-        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
+        firebase_admin.initialize_app(
+            cred, {"databaseURL": FIREBASE_DATABASE_URL})
         USE_FIREBASE = True
         logging.info("Initialized Firebase backend")
     else:
-        logging.warning("Firebase not configured or credentials.json missing; using local storage.")
+        logging.warning(
+            "Firebase not configured or credentials.json missing; using local storage.")
 except Exception as e:
     logging.error(f"Failed to initialize Firebase: {e}")
     USE_FIREBASE = False
@@ -65,6 +68,7 @@ def write_username_to_config(username):
     with open(config_file, "w") as file:
         config.write(file)
 
+
 def validate_url(url):
     """Validate URL format"""
     if not url:
@@ -72,7 +76,8 @@ def validate_url(url):
 
     url_pattern = re.compile(
         r"^https?://"  # http:// or https://
-        r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|"  # domain...
+        # domain...
+        r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|"
         r"localhost|"  # localhost...
         r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # ...or ip
         r"(?::\d+)?"  # optional port
@@ -81,6 +86,43 @@ def validate_url(url):
     )
 
     return bool(url_pattern.match(url))
+
+
+def normalize_subtasks(subtasks):
+    """Normalize subtasks to include stable numeric IDs and optional fields."""
+    if not isinstance(subtasks, list):
+        return []
+
+    normalized = []
+    used_ids = set()
+    next_id = 1
+
+    for raw in subtasks:
+        subtask = dict(raw) if isinstance(raw, dict) else {
+            "name": str(raw) if raw is not None else ""}
+
+        subtask_id = subtask.get("id")
+        if isinstance(subtask_id, str) and subtask_id.isdigit():
+            subtask_id = int(subtask_id)
+        if not isinstance(subtask_id, int) or subtask_id <= 0 or subtask_id in used_ids:
+            while next_id in used_ids:
+                next_id += 1
+            subtask_id = next_id
+
+        used_ids.add(subtask_id)
+        next_id = max(next_id, subtask_id + 1)
+
+        normalized.append({
+            "id": subtask_id,
+            "name": (subtask.get("name") or "").strip(),
+            "description": (subtask.get("description") or "").strip(),
+            "url": (subtask.get("url") or "").strip(),
+            "completed": bool(subtask.get("completed", False)),
+        })
+
+    normalized.sort(key=lambda st: st["id"])
+    return normalized
+
 
 class Task:
     def __init__(
@@ -105,13 +147,15 @@ class Task:
         self.url = url
         self.owner = owner
         self.colour = colour
-        self.subtasks = subtasks if subtasks is not None else []
-    
+        self.subtasks = normalize_subtasks(
+            subtasks if subtasks is not None else [])
+
     def progress_percentage(self):
         """Calculate progress percentage based on completed subtasks"""
         if not self.subtasks:
             return 0
-        completed = sum(1 for st in self.subtasks if st.get('completed', False))
+        completed = sum(
+            1 for st in self.subtasks if st.get('completed', False))
         return int((completed / len(self.subtasks)) * 100) if self.subtasks else 0
 
 
@@ -165,14 +209,15 @@ class TaskManager:
         self.colour_options = {
             "default": {"bg": "white", "fg": "black"},
             "Important": {"bg": "#ffcdd2", "fg": "black"},  # Light red
-            "Moderately Important": {"bg": "#fff9c4", "fg": "black"},  # Light yellow
+            # Light yellow
+            "Moderately Important": {"bg": "#fff9c4", "fg": "black"},
             "Not Important": {"bg": "#c8e6c9", "fg": "black"},  # Light green
             # removed Personal & Work as requested
         }
 
         # Drag-and-drop tracking data (Treeview created in UI setup)
         self.drag_data = {"item": None, "initial_index": None}
-        
+
         # Track which task is being edited
         self.editing_task = None
 
@@ -308,7 +353,7 @@ class TaskManager:
                 "url": getattr(task, "url", ""),
                 "colour": getattr(task, "colour", "default"),
                 "owner": getattr(task, "owner", ""),
-                "subtasks": getattr(task, "subtasks", []),
+                "subtasks": normalize_subtasks(getattr(task, "subtasks", [])),
             }
 
         if task_to_update is not None:
@@ -316,9 +361,11 @@ class TaskManager:
             task_data = make_task_data(task_to_update)
             if USE_FIREBASE:
                 try:
-                    task_ref = db.reference(f"users/{self.username}/tasks/{task_to_update.name}")
+                    task_ref = db.reference(
+                        f"users/{self.username}/tasks/{task_to_update.name}")
                     task_ref.update(task_data)
-                    logging.info(f"Updated task '{task_to_update.name}' in Firebase for user {self.username}")
+                    logging.info(
+                        f"Updated task '{task_to_update.name}' in Firebase for user {self.username}")
                 except Exception as e:
                     logging.error(f"Failed to update task in Firebase: {e}")
                     raise
@@ -332,7 +379,8 @@ class TaskManager:
                     tasks_data[task_to_update.name] = task_data
                     with open(local_file, "w", encoding="utf-8") as f:
                         json.dump(tasks_data, f, indent=2)
-                    logging.info(f"Updated task '{task_to_update.name}' locally for user {self.username} to {local_file}")
+                    logging.info(
+                        f"Updated task '{task_to_update.name}' locally for user {self.username} to {local_file}")
                 except Exception as e:
                     logging.error(f"Failed to update local tasks file: {e}")
                     raise
@@ -347,7 +395,8 @@ class TaskManager:
             try:
                 tasks_ref = db.reference(f"users/{self.username}/tasks")
                 tasks_ref.set(tasks_data)
-                logging.info(f"Tasks saved to Firebase for user {self.username}")
+                logging.info(
+                    f"Tasks saved to Firebase for user {self.username}")
             except Exception as e:
                 logging.error(f"Failed to save tasks to Firebase: {e}")
                 raise
@@ -357,7 +406,8 @@ class TaskManager:
             try:
                 with open(local_file, "w", encoding="utf-8") as f:
                     json.dump(tasks_data, f, indent=2)
-                logging.info(f"Tasks saved locally for user {self.username} to {local_file}")
+                logging.info(
+                    f"Tasks saved locally for user {self.username} to {local_file}")
             except Exception as e:
                 logging.error(f"Failed to save local tasks file: {e}")
                 raise
@@ -366,9 +416,11 @@ class TaskManager:
         """Delete a task by name from Firebase or local JSON"""
         if USE_FIREBASE:
             try:
-                task_ref = db.reference(f"users/{self.username}/tasks/{task_name}")
+                task_ref = db.reference(
+                    f"users/{self.username}/tasks/{task_name}")
                 task_ref.delete()
-                logging.info(f"Deleted task '{task_name}' from Firebase for user {self.username}")
+                logging.info(
+                    f"Deleted task '{task_name}' from Firebase for user {self.username}")
             except Exception as e:
                 logging.error(f"Failed to delete task from Firebase: {e}")
                 raise
@@ -379,13 +431,14 @@ class TaskManager:
                 if os.path.isfile(local_file):
                     with open(local_file, "r", encoding="utf-8") as f:
                         tasks_data = json.load(f) or {}
-                
+
                 # Remove the old task entry if it exists
                 if task_name in tasks_data:
                     del tasks_data[task_name]
                     with open(local_file, "w", encoding="utf-8") as f:
                         json.dump(tasks_data, f, indent=2)
-                    logging.info(f"Deleted task '{task_name}' locally for user {self.username}")
+                    logging.info(
+                        f"Deleted task '{task_name}' locally for user {self.username}")
             except Exception as e:
                 logging.error(f"Failed to delete task from local file: {e}")
                 raise
@@ -431,8 +484,10 @@ class TaskManager:
 
             # Update task orders in the list
             if final_index != self.drag_data["initial_index"]:
-                task_name = self.task_tree.item(self.drag_data["item"])["values"][0]
-                moved_task = next((t for t in self.tasks if t.name == task_name), None)
+                task_name = self.task_tree.item(
+                    self.drag_data["item"])["values"][0]
+                moved_task = next(
+                    (t for t in self.tasks if t.name == task_name), None)
 
                 if moved_task:
                     # Remove task from current position
@@ -462,7 +517,8 @@ class TaskManager:
                 label="View/Edit Description",
                 command=lambda: self.show_task_details(event),
             )
-            menu.add_command(label="Bump to Top", command=lambda: self.bump_task(item))
+            menu.add_command(label="Bump to Top",
+                             command=lambda: self.bump_task(item))
             menu.add_command(
                 label="Delete Task", command=lambda: self.delete_task(item)
             )
@@ -509,12 +565,13 @@ class TaskManager:
     def add_task(self):
         if self.validate_input():
             task_name = self.task_entry.get().strip()
-            
+
             # Check for duplicate task names
             if any(t.name.lower() == task_name.lower() for t in self.tasks):
-                messagebox.showerror("Duplicate Task", f"A task named '{task_name}' already exists.")
+                messagebox.showerror(
+                    "Duplicate Task", f"A task named '{task_name}' already exists.")
                 return
-            
+
             deadline = None
             if self.deadline_var.get():
                 deadline_date = self.deadline_entry_date.get()
@@ -597,12 +654,13 @@ class TaskManager:
             # Store the old name before updating (for handling renames in the database)
             old_name = original_task.name
             new_name = self.task_entry.get().strip()
-            
+
             # Check for duplicate task names (excluding the current task being edited)
             if new_name.lower() != old_name.lower() and any(t.name.lower() == new_name.lower() for t in self.tasks):
-                messagebox.showerror("Duplicate Task", f"A task named '{new_name}' already exists.")
+                messagebox.showerror(
+                    "Duplicate Task", f"A task named '{new_name}' already exists.")
                 return
-            
+
             # Update the task with new values
             original_task.name = new_name
             original_task.deadline = None
@@ -623,7 +681,7 @@ class TaskManager:
                 else:
                     # If name didn't change, just update this task
                     self.save_tasks_to_database(original_task)
-                
+
                 self.update_task_tree()
                 self.update_status_bar()
                 self.clear_task_entry()
@@ -655,27 +713,31 @@ class TaskManager:
         # Search/filter frame
         search_frame = ttk.Frame(main_frame)
         search_frame.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-        
+
         self.search_label = ttk.Label(search_frame, text="Search:")
         self.search_label.pack(side=tk.LEFT, padx=5)
-        
+
         self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=30)
+        self.search_entry = ttk.Entry(
+            search_frame, textvariable=self.search_var, width=30)
         self.search_entry.pack(side=tk.LEFT, padx=5)
         self.search_var.trace("w", lambda *args: self.filter_tasks())
-        
+
         # Status bar (task counts and overdue indicator)
         self.status_var = tk.StringVar(value="")
-        self.status_bar = ttk.Label(search_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        self.status_bar = ttk.Label(
+            search_frame, textvariable=self.status_var, relief=tk.SUNKEN)
         self.status_bar.pack(side=tk.RIGHT, padx=5, fill=tk.X, expand=True)
-        
+
         # Create task entry widgets
         task_frame = ttk.LabelFrame(main_frame, text="Add/Edit Task")
         task_frame.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
         # Configure task_frame grid
-        task_frame.grid_columnconfigure(1, weight=1)  # Make task entry expandable
-        task_frame.grid_columnconfigure(3, weight=0)  # Deadline frame doesn't expand
+        task_frame.grid_columnconfigure(
+            1, weight=1)  # Make task entry expandable
+        # Deadline frame doesn't expand
+        task_frame.grid_columnconfigure(3, weight=0)
 
         # Task name entry
         self.task_label = ttk.Label(task_frame, text="Task:")
@@ -719,7 +781,8 @@ class TaskManager:
         # Status selection
         self.status_label = ttk.Label(task_frame, text="Status:")
         self.status_label.grid(row=0, column=7, padx=5, pady=5, sticky="w")
-        self.status_combobox = ttk.Combobox(task_frame, values=["To Do", "In Progress"])
+        self.status_combobox = ttk.Combobox(
+            task_frame, values=["To Do", "In Progress"])
         self.status_combobox.grid(row=0, column=8, padx=5, pady=5)
         try:
             self.status_combobox.config(width=14)
@@ -745,7 +808,8 @@ class TaskManager:
         # Buttons
         button_frame = ttk.Frame(task_frame)
         # moved buttons to column 11 to accommodate Owner combobox
-        button_frame.grid(row=0, column=11, columnspan=3, padx=5, pady=5, sticky="e")
+        button_frame.grid(row=0, column=11, columnspan=3,
+                          padx=5, pady=5, sticky="e")
 
         self.add_button = ttk.Button(
             button_frame, text="Add Task", command=self.add_task
@@ -777,10 +841,14 @@ class TaskManager:
 
         # Set sensible initial column widths and allow key columns to stretch
         self.task_tree.column("Task", anchor="w", width=340, stretch=True)
-        self.task_tree.column("Deadline", anchor="center", width=160, stretch=True)
-        self.task_tree.column("Status", anchor="center", width=120, stretch=False)
-        self.task_tree.column("Owner", anchor="center", width=140, stretch=False)
-        self.task_tree.column("Priority", anchor="center", width=220, stretch=True)
+        self.task_tree.column("Deadline", anchor="center",
+                              width=160, stretch=True)
+        self.task_tree.column("Status", anchor="center",
+                              width=120, stretch=False)
+        self.task_tree.column("Owner", anchor="center",
+                              width=140, stretch=False)
+        self.task_tree.column("Priority", anchor="center",
+                              width=220, stretch=True)
 
         # Recompute column widths proportionally on resize
         main_frame.bind("<Configure>", self._resize_columns)
@@ -801,9 +869,10 @@ class TaskManager:
         )
         scrollbar.grid(row=2, column=1, sticky="ns")
         self.task_tree.configure(yscrollcommand=scrollbar.set)
-        
+
         # Bind keyboard shortcuts for task entry
-        self.task_entry.bind("<Return>", lambda e: self.handle_task_entry_submit())
+        self.task_entry.bind(
+            "<Return>", lambda e: self.handle_task_entry_submit())
 
         # Configure selection and bind drag/drop + right-click context menu
         self.task_tree.configure(selectmode="browse")
@@ -819,7 +888,8 @@ class TaskManager:
         if self.deadline_var.get():
             self.deadline_entry_date.grid(row=0, column=0, padx=5, pady=5)
             self.deadline_entry_time.grid(row=0, column=1, padx=5, pady=5)
-            self.deadline_frame.grid(row=0, column=3, columnspan=2, padx=5, pady=5)
+            self.deadline_frame.grid(
+                row=0, column=3, columnspan=2, padx=5, pady=5)
         else:
             self.deadline_entry_date.grid_remove()
             self.deadline_entry_time.grid_remove()
@@ -905,7 +975,8 @@ class TaskManager:
         self.task_tree.delete(*self.task_tree.get_children())
         for task in self.tasks:
             deadline_display = task.deadline if task.deadline else "No deadline"
-            values = (task.name, deadline_display, task.status, task.owner or "", task.colour)
+            values = (task.name, deadline_display, task.status,
+                      task.owner or "", task.colour)
             item = self.task_tree.insert("", tk.END, values=values)
             self.task_tree.item(item, tags=(task.colour,))
         # ensure columns are adjusted after repopulating
@@ -915,43 +986,46 @@ class TaskManager:
     def update_status_bar(self):
         """Update the status bar with task counts and overdue indicator"""
         total_tasks = len(self.tasks)
-        completed_tasks = len([t for t in self.tasks if t.status == "In Progress"])
+        completed_tasks = len(
+            [t for t in self.tasks if t.status == "In Progress"])
         to_do_tasks = len([t for t in self.tasks if t.status == "To Do"])
-        
+
         # Check for overdue tasks
         overdue_count = 0
         now = datetime.now()
         for task in self.tasks:
             if task.deadline and task.status != "In Progress":
                 try:
-                    deadline_datetime = datetime.strptime(task.deadline, "%Y-%m-%d %H:%M")
+                    deadline_datetime = datetime.strptime(
+                        task.deadline, "%Y-%m-%d %H:%M")
                     if deadline_datetime < now:
                         overdue_count += 1
                 except Exception:
                     pass
-        
+
         # Build status message
         status_msg = f"Total: {total_tasks} | To Do: {to_do_tasks} | In Progress: {completed_tasks}"
         if overdue_count > 0:
             status_msg += f" | ⚠ {overdue_count} overdue"
-        
+
         self.status_var.set(status_msg)
 
     def filter_tasks(self):
         """Filter tasks based on search query"""
         search_term = self.search_var.get().lower()
         self.task_tree.delete(*self.task_tree.get_children())
-        
+
         for task in self.tasks:
             # Show task if search term matches task name, description, or owner (case-insensitive)
-            if (search_term == "" or 
-                search_term in task.name.lower() or 
-                search_term in task.owner.lower()):
+            if (search_term == "" or
+                search_term in task.name.lower() or
+                    search_term in task.owner.lower()):
                 deadline_display = task.deadline if task.deadline else "No deadline"
-                values = (task.name, deadline_display, task.status, task.owner or "", task.colour)
+                values = (task.name, deadline_display, task.status,
+                          task.owner or "", task.colour)
                 item = self.task_tree.insert("", tk.END, values=values)
                 self.task_tree.item(item, tags=(task.colour,))
-        
+
         self._resize_columns()
 
     def refresh_tasks_with_feedback(self):
@@ -983,7 +1057,8 @@ class TaskManager:
             status_w = int(total * 0.12)
             owner_w = int(total * 0.12)
             # increase minimum for Priority so long labels are not truncated
-            priority_w = max(int(total - (task_w + deadline_w + status_w + owner_w)), 180)
+            priority_w = max(
+                int(total - (task_w + deadline_w + status_w + owner_w)), 180)
             self.task_tree.column("Task", width=task_w)
             self.task_tree.column("Deadline", width=deadline_w)
             self.task_tree.column("Status", width=status_w)
@@ -1058,11 +1133,13 @@ class TaskDescriptionWindow:
         self.status_bar.pack(fill=tk.X, side=tk.BOTTOM, padx=5)
 
         # Description frame
-        description_frame = ttk.LabelFrame(main_frame, text="Description", padding=10)
+        description_frame = ttk.LabelFrame(
+            main_frame, text="Description", padding=10)
         description_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Description text area
-        self.description_text = tk.Text(description_frame, wrap=tk.WORD, height=6)
+        self.description_text = tk.Text(
+            description_frame, wrap=tk.WORD, height=6)
         self.description_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # If there's an existing description, insert it
@@ -1082,7 +1159,8 @@ class TaskDescriptionWindow:
             self.url_entry.insert(0, task.url)
 
         # Subtasks frame
-        subtasks_frame = ttk.LabelFrame(main_frame, text="Sub-tasks", padding=10)
+        subtasks_frame = ttk.LabelFrame(
+            main_frame, text="Sub-tasks", padding=10)
         subtasks_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Subtasks list with scrollbar
@@ -1092,13 +1170,15 @@ class TaskDescriptionWindow:
         scrollbar = ttk.Scrollbar(subtasks_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.subtasks_listbox = tk.Listbox(subtasks_container, yscrollcommand=scrollbar.set, height=6)
+        self.subtasks_listbox = tk.Listbox(
+            subtasks_container, yscrollcommand=scrollbar.set, height=6)
         self.subtasks_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.subtasks_listbox.yview)
 
         # Load existing subtasks (deep copy)
         import copy
-        self.subtasks = copy.deepcopy(getattr(task, "subtasks", []))
+        self.subtasks = normalize_subtasks(
+            copy.deepcopy(getattr(task, "subtasks", [])))
         self.update_subtasks_listbox()
 
         # Subtask controls
@@ -1106,12 +1186,18 @@ class TaskDescriptionWindow:
         subtask_controls.pack(fill=tk.X, pady=5)
 
         self.subtask_entry = ttk.Entry(subtask_controls)
-        self.subtask_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        self.subtask_entry.pack(side=tk.LEFT, fill=tk.X,
+                                expand=True, padx=(0, 5))
         self.subtask_entry.bind("<Return>", lambda e: self.add_subtask())
 
-        ttk.Button(subtask_controls, text="Add", command=self.add_subtask).pack(side=tk.LEFT, padx=2)
-        ttk.Button(subtask_controls, text="Toggle", command=self.toggle_subtask).pack(side=tk.LEFT, padx=2)
-        ttk.Button(subtask_controls, text="Delete", command=self.delete_subtask).pack(side=tk.LEFT, padx=2)
+        ttk.Button(subtask_controls, text="Add",
+                   command=self.add_subtask).pack(side=tk.LEFT, padx=2)
+        ttk.Button(subtask_controls, text="Edit",
+                   command=self.edit_subtask).pack(side=tk.LEFT, padx=2)
+        ttk.Button(subtask_controls, text="Toggle",
+                   command=self.toggle_subtask).pack(side=tk.LEFT, padx=2)
+        ttk.Button(subtask_controls, text="Delete",
+                   command=self.delete_subtask).pack(side=tk.LEFT, padx=2)
 
         # Buttons frame
         button_frame = ttk.Frame(main_frame)
@@ -1130,7 +1216,8 @@ class TaskDescriptionWindow:
         self.cancel_button.pack(side=tk.RIGHT, padx=5)
 
         # Bind keyboard shortcuts
-        self.window.bind("<Control-s>", lambda e: self.save_with_verification())
+        self.window.bind(
+            "<Control-s>", lambda e: self.save_with_verification())
         self.window.bind("<Escape>", lambda e: self.confirm_close())
 
         # Bind window close event
@@ -1156,39 +1243,112 @@ class TaskDescriptionWindow:
         # Bind text changes to track modifications
         self.description_text.bind("<<Modified>>", self.on_modify)
         self.url_entry.bind("<Key>", self.on_modify)
-    
+
     def update_subtasks_listbox(self):
         """Update the subtasks listbox display"""
+        self.subtasks = normalize_subtasks(self.subtasks)
         self.subtasks_listbox.delete(0, tk.END)
         for idx, subtask in enumerate(self.subtasks):
             checkbox = "☑" if subtask.get('completed', False) else "☐"
-            display_text = f"{checkbox} {subtask.get('name', 'Unnamed')}"
+            subtask_id = subtask.get('id', idx + 1)
+            has_details = bool(subtask.get('description')
+                               or subtask.get('url'))
+            details_suffix = " • details" if has_details else ""
+            display_text = f"{checkbox} #{subtask_id} {subtask.get('name', 'Unnamed')}{details_suffix}"
             self.subtasks_listbox.insert(tk.END, display_text)
-    
+
     def add_subtask(self):
         """Add a new subtask"""
         subtask_name = self.subtask_entry.get().strip()
         if subtask_name:
-            self.subtasks.append({"name": subtask_name, "completed": False})
+            self.subtasks = normalize_subtasks(self.subtasks)
+            next_id = max((st.get("id", 0)
+                          for st in self.subtasks), default=0) + 1
+            self.subtasks.append({
+                "id": next_id,
+                "name": subtask_name,
+                "description": "",
+                "url": "",
+                "completed": False,
+            })
             self.update_subtasks_listbox()
             self.subtask_entry.delete(0, tk.END)
             self.on_modify()
-    
+
+    def edit_subtask(self):
+        """Edit selected subtask fields"""
+        selection = self.subtasks_listbox.curselection()
+        if not selection:
+            return
+
+        idx = selection[0]
+        self.subtasks = normalize_subtasks(self.subtasks)
+        subtask = self.subtasks[idx]
+        subtask_id = subtask.get("id", idx + 1)
+
+        new_name = simpledialog.askstring(
+            "Edit Sub-task",
+            f"Sub-task #{subtask_id} name:",
+            initialvalue=subtask.get("name", ""),
+            parent=self.window,
+        )
+        if new_name is None:
+            return
+        new_name = new_name.strip()
+        if not new_name:
+            messagebox.showerror("Invalid Name", "Sub-task name is required.")
+            return
+
+        new_description = simpledialog.askstring(
+            "Edit Sub-task",
+            f"Sub-task #{subtask_id} description (optional):",
+            initialvalue=subtask.get("description", ""),
+            parent=self.window,
+        )
+        if new_description is None:
+            return
+
+        new_url = simpledialog.askstring(
+            "Edit Sub-task",
+            f"Sub-task #{subtask_id} URL (optional):",
+            initialvalue=subtask.get("url", ""),
+            parent=self.window,
+        )
+        if new_url is None:
+            return
+
+        new_url = new_url.strip()
+        if new_url and not validate_url(new_url):
+            messagebox.showerror(
+                "Invalid URL", "Please enter a valid URL starting with 'http://' or 'https://'")
+            return
+
+        subtask["name"] = new_name
+        subtask["description"] = (new_description or "").strip()
+        subtask["url"] = new_url
+
+        self.update_subtasks_listbox()
+        self.subtasks_listbox.selection_set(idx)
+        self.on_modify()
+
     def toggle_subtask(self):
         """Toggle the completion status of selected subtask"""
         selection = self.subtasks_listbox.curselection()
         if selection:
             idx = selection[0]
-            self.subtasks[idx]['completed'] = not self.subtasks[idx].get('completed', False)
+            self.subtasks = normalize_subtasks(self.subtasks)
+            self.subtasks[idx]['completed'] = not self.subtasks[idx].get(
+                'completed', False)
             self.update_subtasks_listbox()
             self.subtasks_listbox.selection_set(idx)
             self.on_modify()
-    
+
     def delete_subtask(self):
         """Delete the selected subtask"""
         selection = self.subtasks_listbox.curselection()
         if selection:
             idx = selection[0]
+            self.subtasks = normalize_subtasks(self.subtasks)
             del self.subtasks[idx]
             self.update_subtasks_listbox()
             self.on_modify()

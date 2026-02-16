@@ -13,7 +13,8 @@ from services.reminder_service import ReminderService
 from services.dashboard_service import DashboardService
 from services.forum_sync_service import ForumSyncService
 from discord_ui.select_menus import TaskFilterView
-from discord_ui.modals import ConfigureTaskModal
+from discord_ui.modals import ConfigureTaskModal, ConfigureSubtaskModal
+from discord_ui.buttons import ConfirmationButtons
 from utils.logger import setup_logging
 from database.firebase_manager import DatabaseManager
 
@@ -240,7 +241,10 @@ async def help_command(interaction: discord.Interaction):
         value="`/help` - Show this help message\n"
               "`/refresh` - Manually refresh the task board\n"
               "`/taskboard` - (Admin) Create a new task board\n"
-              "`/configure` - Configure task fields from inside a task thread",
+              "`/configure` - Configure task fields from inside a task thread\n"
+              "`/subtask` - Create or edit a sub-task by numeric ID in a task thread\n"
+              "`/subtask-toggle` - Toggle completion for a sub-task by ID\n"
+              "`/subtask-delete` - Delete a sub-task by ID",
         inline=False
     )
 
@@ -324,6 +328,159 @@ async def configure_task(interaction: discord.Interaction):
         current_description=task.description or "",
         current_url=task.url or "",
     ))
+
+
+@bot.tree.command(name="subtask", description="Create or edit a sub-task by numeric ID in this task thread")
+@app_commands.describe(subtask_id="Numeric sub-task ID (e.g. 1)")
+async def configure_subtask(interaction: discord.Interaction, subtask_id: int):
+    """Create or edit a sub-task by numeric ID from within a task thread"""
+    if subtask_id <= 0:
+        await interaction.response.send_message("❌ Sub-task ID must be a positive integer.", ephemeral=True)
+        return
+
+    if not Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message(
+            "❌ Forum mode is not enabled.",
+            ephemeral=True
+        )
+        return
+
+    if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message(
+            "❌ Use this command inside a task thread in the configured forum.",
+            ephemeral=True
+        )
+        return
+
+    task_uuid = forum_sync_service.get_task_uuid_for_thread(
+        interaction.channel.id)
+    if not task_uuid:
+        await interaction.response.send_message("❌ This thread is not linked to a task.", ephemeral=True)
+        return
+
+    from services.task_service import TaskService
+    task_service = TaskService()
+    task = await task_service.get_task_by_uuid(task_uuid)
+    if not task:
+        await interaction.response.send_message("❌ Linked task was not found.", ephemeral=True)
+        return
+
+    existing_subtask = await task_service.get_subtask_by_id(task_uuid, subtask_id)
+    await interaction.response.send_modal(ConfigureSubtaskModal(
+        task_uuid=task_uuid,
+        subtask_id=subtask_id,
+        existing_subtask=existing_subtask,
+    ))
+
+
+@bot.tree.command(name="subtask-toggle", description="Toggle completion for a sub-task by numeric ID in this task thread")
+@app_commands.describe(subtask_id="Numeric sub-task ID (e.g. 1)")
+async def toggle_subtask(interaction: discord.Interaction, subtask_id: int):
+    """Toggle completion for a sub-task by numeric ID from within a task thread"""
+    if subtask_id <= 0:
+        await interaction.response.send_message("❌ Sub-task ID must be a positive integer.", ephemeral=True)
+        return
+
+    if not Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message("❌ Forum mode is not enabled.", ephemeral=True)
+        return
+
+    if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message(
+            "❌ Use this command inside a task thread in the configured forum.",
+            ephemeral=True
+        )
+        return
+
+    task_uuid = forum_sync_service.get_task_uuid_for_thread(
+        interaction.channel.id)
+    if not task_uuid:
+        await interaction.response.send_message("❌ This thread is not linked to a task.", ephemeral=True)
+        return
+
+    from services.task_service import TaskService
+    task_service = TaskService()
+
+    try:
+        subtask = await task_service.toggle_subtask_by_id(task_uuid, subtask_id)
+        await forum_sync_service.sync_from_database()
+        await dashboard_service.update_dashboard()
+
+        status = "complete" if subtask.get('completed') else "incomplete"
+        await interaction.response.send_message(
+            f"✅ Sub-task #{subtask_id} marked {status}.",
+            ephemeral=True,
+        )
+    except ValueError as e:
+        await interaction.response.send_message(f"❌ {str(e)}", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error toggling sub-task: {str(e)}", ephemeral=True)
+
+
+@bot.tree.command(name="subtask-delete", description="Delete a sub-task by numeric ID in this task thread")
+@app_commands.describe(subtask_id="Numeric sub-task ID (e.g. 1)")
+async def delete_subtask(interaction: discord.Interaction, subtask_id: int):
+    """Delete a sub-task by numeric ID from within a task thread"""
+    if subtask_id <= 0:
+        await interaction.response.send_message("❌ Sub-task ID must be a positive integer.", ephemeral=True)
+        return
+
+    if not Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message("❌ Forum mode is not enabled.", ephemeral=True)
+        return
+
+    if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != Settings.TASK_FORUM_CHANNEL:
+        await interaction.response.send_message(
+            "❌ Use this command inside a task thread in the configured forum.",
+            ephemeral=True
+        )
+        return
+
+    task_uuid = forum_sync_service.get_task_uuid_for_thread(
+        interaction.channel.id)
+    if not task_uuid:
+        await interaction.response.send_message("❌ This thread is not linked to a task.", ephemeral=True)
+        return
+
+    from services.task_service import TaskService
+    task_service = TaskService()
+
+    try:
+        existing_subtask = await task_service.get_subtask_by_id(task_uuid, subtask_id)
+        if not existing_subtask:
+            await interaction.response.send_message(f"❌ Sub-task #{subtask_id} not found.", ephemeral=True)
+            return
+
+        view = ConfirmationButtons(
+            timeout=45, requester_id=interaction.user.id)
+        await interaction.response.send_message(
+            f"⚠️ Confirm delete for sub-task #{subtask_id}: {existing_subtask.get('name', 'Unnamed sub-task')}?",
+            ephemeral=True,
+            view=view,
+        )
+
+        timed_out = await view.wait()
+        if timed_out or view.value is None:
+            await interaction.edit_original_response(content="⌛ Delete request timed out.", view=None)
+            return
+
+        if not view.value:
+            await interaction.edit_original_response(content="❎ Delete cancelled.", view=None)
+            return
+
+        removed = await task_service.delete_subtask_by_id(task_uuid, subtask_id)
+        await forum_sync_service.sync_from_database()
+        await dashboard_service.update_dashboard()
+
+        await interaction.edit_original_response(
+            content=f"✅ Deleted sub-task #{subtask_id}: {removed.get('name', 'Unnamed sub-task')}.",
+            view=None,
+        )
+    except Exception as e:
+        if interaction.response.is_done():
+            await interaction.edit_original_response(content=f"❌ Error deleting sub-task: {str(e)}", view=None)
+        else:
+            await interaction.response.send_message(f"❌ Error deleting sub-task: {str(e)}", ephemeral=True)
 
 
 def main():

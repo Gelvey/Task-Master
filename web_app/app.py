@@ -37,8 +37,11 @@ logger = logging.getLogger(__name__)
 SINGLE_USER_MODE = os.getenv('TASKMASTER_USERNAME')
 
 # Host/IP Whitelist configuration
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
-ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS if host.strip()]  # Clean up whitespace
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(
+    ',') if os.getenv('ALLOWED_HOSTS') else []
+ALLOWED_HOSTS = [host.strip()
+                 # Clean up whitespace
+                 for host in ALLOWED_HOSTS if host.strip()]
 
 # Firebase configuration
 FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL")
@@ -59,23 +62,29 @@ if FIREBASE_AVAILABLE and FIREBASE_DATABASE_URL:
             "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
             "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL")
         }
-        
+
         # Check if all required Firebase env vars are present
         if all([firebase_creds["project_id"], firebase_creds["private_key"], firebase_creds["client_email"]]):
             cred = credentials.Certificate(firebase_creds)
-            firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
+            firebase_admin.initialize_app(
+                cred, {"databaseURL": FIREBASE_DATABASE_URL})
             USE_FIREBASE = True
-            logger.info("Initialized Firebase backend from environment variables")
+            logger.info(
+                "Initialized Firebase backend from environment variables")
         else:
             # Fallback to credentials.json file
-            cred_path = os.path.join(os.path.dirname(__file__), "..", "credentials.json")
+            cred_path = os.path.join(os.path.dirname(
+                __file__), "..", "credentials.json")
             if os.path.isfile(cred_path):
                 cred = credentials.Certificate(cred_path)
-                firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
+                firebase_admin.initialize_app(
+                    cred, {"databaseURL": FIREBASE_DATABASE_URL})
                 USE_FIREBASE = True
-                logger.info("Initialized Firebase backend from credentials.json")
+                logger.info(
+                    "Initialized Firebase backend from credentials.json")
             else:
-                logger.warning("Firebase credentials not found in environment or file; using local storage.")
+                logger.warning(
+                    "Firebase credentials not found in environment or file; using local storage.")
     except Exception as e:
         logger.error(f"Failed to initialize Firebase: {e}")
         USE_FIREBASE = False
@@ -92,39 +101,78 @@ COLOUR_OPTIONS = {
 }
 
 
+def normalize_subtasks(subtasks):
+    """Normalize subtasks to stable schema with numeric IDs."""
+    if not isinstance(subtasks, list):
+        return []
+
+    normalized = []
+    used_ids = set()
+    next_id = 1
+
+    for raw in subtasks:
+        if isinstance(raw, dict):
+            subtask = dict(raw)
+        else:
+            subtask = {'name': str(raw) if raw is not None else ''}
+
+        subtask_id = subtask.get('id')
+        if isinstance(subtask_id, str) and subtask_id.isdigit():
+            subtask_id = int(subtask_id)
+        if not isinstance(subtask_id, int) or subtask_id <= 0 or subtask_id in used_ids:
+            while next_id in used_ids:
+                next_id += 1
+            subtask_id = next_id
+
+        used_ids.add(subtask_id)
+        next_id = max(next_id, subtask_id + 1)
+
+        normalized.append({
+            'id': subtask_id,
+            'name': (subtask.get('name') or '').strip(),
+            'description': (subtask.get('description') or '').strip(),
+            'url': (subtask.get('url') or '').strip(),
+            'completed': bool(subtask.get('completed', False)),
+        })
+
+    normalized.sort(key=lambda st: st['id'])
+    return normalized
+
+
 def check_ip_whitelist():
     """Check if the request IP is in the whitelist (supports both IPs and hostnames with DNS lookup)"""
     if not ALLOWED_HOSTS:
         return True  # No whitelist configured, allow all
-    
+
     # Get the client IP address
     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if client_ip:
         # X-Forwarded-For can contain multiple IPs, take the first one
         client_ip = client_ip.split(',')[0].strip()
-    
+
     # Check each allowed host/IP
     for allowed_host in ALLOWED_HOSTS:
         # If it's a direct IP match
         if client_ip == allowed_host:
             return True
-        
+
         # Try DNS lookup (for hostnames). No caching for DynDNS support
         # Using getaddrinfo to support both IPv4 and IPv6
         try:
             # Get all IP addresses (IPv4 and IPv6) for the hostname
             addr_info = socket.getaddrinfo(allowed_host, None)
             resolved_ips = [addr[4][0] for addr in addr_info]
-            
+
             if client_ip in resolved_ips:
-                logger.info(f"Access granted for IP {client_ip} (resolved from hostname {allowed_host})")
+                logger.info(
+                    f"Access granted for IP {client_ip} (resolved from hostname {allowed_host})")
                 return True
         except socket.gaierror:
             # Not a valid hostname, continue to next entry
             pass
         except Exception as e:
             logger.warning(f"Error resolving hostname {allowed_host}: {e}")
-    
+
     logger.warning(f"Access denied for IP: {client_ip}")
     return False
 
@@ -160,7 +208,8 @@ def load_tasks(username):
     """Load tasks from Firebase or local storage"""
     tasks = []
     migrated_missing_uuid = False
-    
+    migrated_subtasks = False
+
     if USE_FIREBASE:
         try:
             tasks_ref = db.reference(f"users/{username}/tasks")
@@ -171,6 +220,11 @@ def load_tasks(username):
                     if not task_data.get('uuid'):
                         task_data['uuid'] = str(uuid.uuid4())
                         migrated_missing_uuid = True
+                    normalized_subtasks = normalize_subtasks(
+                        task_data.get('subtasks', []))
+                    if task_data.get('subtasks', []) != normalized_subtasks:
+                        migrated_subtasks = True
+                    task_data['subtasks'] = normalized_subtasks
                     tasks.append(task_data)
         except Exception as e:
             logger.error(f"Failed to load tasks from Firebase: {e}")
@@ -187,20 +241,25 @@ def load_tasks(username):
                             if not task_data.get('uuid'):
                                 task_data['uuid'] = str(uuid.uuid4())
                                 migrated_missing_uuid = True
+                            normalized_subtasks = normalize_subtasks(
+                                task_data.get('subtasks', []))
+                            if task_data.get('subtasks', []) != normalized_subtasks:
+                                migrated_subtasks = True
+                            task_data['subtasks'] = normalized_subtasks
                             tasks.append(task_data)
             except Exception as e:
                 logger.error(f"Failed to read local tasks file: {e}")
-    
+
     # Sort tasks by order
     tasks.sort(key=lambda x: x.get('order', 0))
-    
+
     # Backfill UUIDs without changing existing task keys/IDs.
-    if migrated_missing_uuid and tasks:
+    if (migrated_missing_uuid or migrated_subtasks) and tasks:
         try:
             save_tasks(username, tasks)
         except Exception as e:
             logger.warning(f"Failed UUID backfill for {username}: {e}")
-    
+
     return tasks
 
 
@@ -221,9 +280,9 @@ def save_tasks(username, tasks):
             'url': task.get('url', ''),
             'owner': task.get('owner', ''),
             'colour': task.get('colour', 'default'),
-            'subtasks': task.get('subtasks', []),
+            'subtasks': normalize_subtasks(task.get('subtasks', [])),
         }
-    
+
     if USE_FIREBASE:
         try:
             tasks_ref = db.reference(f"users/{username}/tasks")
@@ -261,7 +320,7 @@ def delete_task(username, task_id):
             if os.path.isfile(local_file):
                 with open(local_file, "r", encoding="utf-8") as f:
                     tasks_data = json.load(f) or {}
-            
+
             if task_id in tasks_data:
                 del tasks_data[task_id]
                 with open(local_file, "w", encoding="utf-8") as f:
@@ -290,7 +349,7 @@ def login():
     if SINGLE_USER_MODE:
         session['username'] = SINGLE_USER_MODE
         return redirect(url_for('tasks'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         if username:
@@ -315,10 +374,10 @@ def logout():
 def tasks():
     """Main tasks page"""
     username = session.get('username')
-    return render_template('tasks.html', 
-                         username=username,
-                         colour_options=COLOUR_OPTIONS,
-                         owners=OWNERS)
+    return render_template('tasks.html',
+                           username=username,
+                           colour_options=COLOUR_OPTIONS,
+                           owners=OWNERS)
 
 
 @app.route('/api/tasks', methods=['GET'])
@@ -342,7 +401,7 @@ def create_task():
     try:
         data = request.get_json()
         tasks = load_tasks(username)
-        
+
         # Create new task
         new_task = {
             'id': data['name'],
@@ -355,12 +414,12 @@ def create_task():
             'url': data.get('url', ''),
             'owner': data.get('owner', ''),
             'colour': data.get('colour', 'default'),
-            'subtasks': data.get('subtasks', []),
+            'subtasks': normalize_subtasks(data.get('subtasks', [])),
         }
-        
+
         tasks.append(new_task)
         save_tasks(username, tasks)
-        
+
         return jsonify({'success': True, 'task': new_task})
     except Exception as e:
         logger.error(f"Error creating task: {e}")
@@ -375,7 +434,7 @@ def update_task(task_id):
     try:
         data = request.get_json()
         tasks = load_tasks(username)
-        
+
         # Find and update task
         for task in tasks:
             if task['id'] == task_id:
@@ -388,10 +447,10 @@ def update_task(task_id):
                     'url': data.get('url', task.get('url', '')),
                     'owner': data.get('owner', task.get('owner', '')),
                     'colour': data.get('colour', task.get('colour', 'default')),
-                    'subtasks': data.get('subtasks', task.get('subtasks', [])),
+                    'subtasks': normalize_subtasks(data.get('subtasks', task.get('subtasks', []))),
                 })
                 break
-        
+
         save_tasks(username, tasks)
         return jsonify({'success': True})
     except Exception as e:
@@ -440,7 +499,8 @@ def reorder_tasks():
         provided_set = set(task_ids)
 
         # Ensure provided ids are a subset of the tasks that have the same colour
-        group_task_ids = [t['id'] for t in tasks if t.get('colour', 'default') == group_colour]
+        group_task_ids = [t['id'] for t in tasks if t.get(
+            'colour', 'default') == group_colour]
         if not provided_set.issubset(set(group_task_ids)):
             return jsonify({'success': False, 'error': 'Invalid task ids for priority group'}), 400
 

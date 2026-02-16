@@ -332,6 +332,10 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
 
     async def on_submit(self, interaction: discord.Interaction):
         from services.task_service import TaskService
+        from services.forum_sync_service import ForumSyncService
+        from services.dashboard_service import DashboardService
+        from database.firebase_manager import DatabaseManager
+        from config.settings import Settings
 
         status, priority = self._parse_status_priority()
         owner = (self.owner.value or "").strip()
@@ -396,3 +400,93 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
             await interaction.response.send_message(f"✅ Sub-task '{self.subtask_name.value}' added successfully!", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error adding sub-task: {str(e)}", ephemeral=True)
+
+
+class ConfigureSubtaskModal(ui.Modal):
+    """Create or edit a specific subtask by numeric ID"""
+
+    def __init__(self, task_uuid: str, subtask_id: int, existing_subtask: Optional[dict] = None):
+        title = f"Edit Sub-task #{subtask_id}" if existing_subtask else f"Create Sub-task #{subtask_id}"
+        super().__init__(title=title)
+        self.task_uuid = task_uuid
+        self.subtask_id = subtask_id
+        self._is_editing = existing_subtask is not None
+
+        existing_subtask = existing_subtask or {}
+
+        self.subtask_name = ui.TextInput(
+            label="Sub-task Name",
+            default=existing_subtask.get('name', ''),
+            placeholder="Enter sub-task name...",
+            required=True,
+            max_length=200,
+        )
+        self.add_item(self.subtask_name)
+
+        self.subtask_description = ui.TextInput(
+            label="Description",
+            default=existing_subtask.get('description', ''),
+            placeholder="Optional sub-task description",
+            required=False,
+            style=discord.TextStyle.paragraph,
+            max_length=1000,
+        )
+        self.add_item(self.subtask_description)
+
+        self.subtask_url = ui.TextInput(
+            label="URL",
+            default=existing_subtask.get('url', ''),
+            placeholder="https://example.com (optional)",
+            required=False,
+            max_length=200,
+        )
+        self.add_item(self.subtask_url)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from services.task_service import TaskService
+
+        name = (self.subtask_name.value or '').strip()
+        if not name:
+            await interaction.response.send_message("❌ Sub-task name is required.", ephemeral=True)
+            return
+
+        url = (self.subtask_url.value or '').strip()
+        if url and not validate_url(url):
+            await interaction.response.send_message(
+                "❌ Invalid URL format. Use a full URL starting with http:// or https://.",
+                ephemeral=True,
+            )
+            return
+
+        description = (self.subtask_description.value or '').strip()
+
+        task_service = TaskService()
+        try:
+            await task_service.upsert_subtask_by_id(
+                task_uuid=self.task_uuid,
+                subtask_id=self.subtask_id,
+                name=name,
+                description=description,
+                url=url,
+            )
+
+            if Settings.TASK_FORUM_CHANNEL:
+                db_manager = DatabaseManager(
+                    use_firebase=not Settings.USE_LOCAL_STORAGE)
+                forum_service = ForumSyncService()
+                forum_service.set_bot(interaction.client)
+                forum_service.set_database(db_manager)
+                await forum_service.sync_from_database()
+
+                dashboard_service = DashboardService()
+                dashboard_service.set_bot(interaction.client)
+                dashboard_service.set_database(db_manager)
+                await dashboard_service.update_dashboard()
+
+            action = "updated" if self._is_editing else "created"
+            await interaction.response.send_message(
+                f"✅ Sub-task #{self.subtask_id} {action} successfully.",
+                ephemeral=True,
+            )
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error saving sub-task: {str(e)}", ephemeral=True)

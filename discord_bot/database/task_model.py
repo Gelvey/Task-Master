@@ -2,10 +2,48 @@
 Task data model matching the Task-Master schema
 """
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
 from utils.validators import parse_deadline, format_deadline_for_display
+
+
+def normalize_subtasks(subtasks: Any) -> List[Dict[str, Any]]:
+    """Normalize subtask list to stable schema with numeric IDs."""
+    if not isinstance(subtasks, list):
+        return []
+
+    normalized = []
+    used_ids = set()
+    next_id = 1
+
+    for raw in subtasks:
+        if isinstance(raw, dict):
+            subtask = dict(raw)
+        else:
+            subtask = {'name': str(raw) if raw is not None else ''}
+
+        subtask_id = subtask.get('id')
+        if isinstance(subtask_id, str) and subtask_id.isdigit():
+            subtask_id = int(subtask_id)
+        if not isinstance(subtask_id, int) or subtask_id <= 0 or subtask_id in used_ids:
+            while next_id in used_ids:
+                next_id += 1
+            subtask_id = next_id
+
+        used_ids.add(subtask_id)
+        next_id = max(next_id, subtask_id + 1)
+
+        normalized.append({
+            'id': subtask_id,
+            'name': (subtask.get('name') or '').strip(),
+            'description': (subtask.get('description') or '').strip(),
+            'url': (subtask.get('url') or '').strip(),
+            'completed': bool(subtask.get('completed', False)),
+        })
+
+    normalized.sort(key=lambda st: st['id'])
+    return normalized
 
 
 @dataclass
@@ -37,7 +75,7 @@ class Task:
             'url': self.url,
             'owner': self.owner,
             'colour': self.colour,
-            'subtasks': self.subtasks
+            'subtasks': normalize_subtasks(self.subtasks)
         }
 
     @classmethod
@@ -55,7 +93,7 @@ class Task:
             url=data.get('url', ''),
             owner=data.get('owner', ''),
             colour=data.get('colour', 'default'),
-            subtasks=data.get('subtasks', [])
+            subtasks=normalize_subtasks(data.get('subtasks', []))
         )
 
     @property

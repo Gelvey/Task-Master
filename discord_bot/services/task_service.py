@@ -4,7 +4,7 @@ Task service layer for business logic
 import logging
 from typing import List, Optional
 from database.firebase_manager import DatabaseManager
-from database.task_model import Task
+from database.task_model import Task, normalize_subtasks
 
 logger = logging.getLogger(__name__)
 
@@ -162,10 +162,115 @@ class TaskService:
 
     async def _trigger_forum_sync(self):
         """Helper to trigger forum sync after subtask changes"""
-        from .forum_sync_service import ForumSyncService
-        forum_service = ForumSyncService()
-        if forum_service._bot:
-            await forum_service.sync_from_database()
+        from .message_updater import MessageUpdater
+        updater = MessageUpdater()
+        await updater.update_all_task_boards()
+
+    def _normalize_and_save_subtasks_if_needed(self, task: Task) -> List[dict]:
+        normalized = normalize_subtasks(task.subtasks)
+        if task.subtasks != normalized:
+            self.db.update_task(self.username, task.id, {
+                                'subtasks': normalized})
+        return normalized
+
+    async def get_subtask_by_id(self, task_uuid: str, subtask_id: int) -> Optional[dict]:
+        """Get subtask by stable numeric ID."""
+        if subtask_id <= 0:
+            return None
+
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            return None
+
+        subtasks = self._normalize_and_save_subtasks_if_needed(task)
+        for subtask in subtasks:
+            if subtask.get('id') == subtask_id:
+                return subtask
+        return None
+
+    async def upsert_subtask_by_id(self, task_uuid: str, subtask_id: int, name: str,
+                                   description: str = "", url: str = "") -> dict:
+        """Create or update a subtask by stable numeric ID."""
+        if subtask_id <= 0:
+            raise ValueError("Sub-task ID must be a positive integer")
+
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+
+        subtasks = self._normalize_and_save_subtasks_if_needed(task)
+        existing = next(
+            (st for st in subtasks if st.get('id') == subtask_id), None)
+
+        if existing:
+            existing['name'] = name.strip()
+            existing['description'] = description.strip()
+            existing['url'] = url.strip()
+            saved_subtask = existing
+        else:
+            saved_subtask = {
+                'id': subtask_id,
+                'name': name.strip(),
+                'description': description.strip(),
+                'url': url.strip(),
+                'completed': False,
+            }
+            subtasks.append(saved_subtask)
+
+        subtasks = normalize_subtasks(subtasks)
+        self.db.update_task(self.username, task.id, {'subtasks': subtasks})
+        logger.info(
+            f"Upserted subtask #{subtask_id} for task UUID {task_uuid}")
+
+        await self._trigger_forum_sync()
+        return next((st for st in subtasks if st.get('id') == subtask_id), saved_subtask)
+
+    async def toggle_subtask_by_id(self, task_uuid: str, subtask_id: int) -> dict:
+        """Toggle completion state for a subtask by stable numeric ID."""
+        if subtask_id <= 0:
+            raise ValueError("Sub-task ID must be a positive integer")
+
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+
+        subtasks = self._normalize_and_save_subtasks_if_needed(task)
+        target = next(
+            (st for st in subtasks if st.get('id') == subtask_id), None)
+        if not target:
+            raise ValueError(f"Sub-task #{subtask_id} not found")
+
+        target['completed'] = not bool(target.get('completed', False))
+        subtasks = normalize_subtasks(subtasks)
+        self.db.update_task(self.username, task.id, {'subtasks': subtasks})
+        logger.info(f"Toggled subtask #{subtask_id} for task UUID {task_uuid}")
+
+        await self._trigger_forum_sync()
+        return next((st for st in subtasks if st.get('id') == subtask_id), target)
+
+    async def delete_subtask_by_id(self, task_uuid: str, subtask_id: int) -> dict:
+        """Delete a subtask by stable numeric ID."""
+        if subtask_id <= 0:
+            raise ValueError("Sub-task ID must be a positive integer")
+
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+
+        subtasks = self._normalize_and_save_subtasks_if_needed(task)
+        existing = next(
+            (st for st in subtasks if st.get('id') == subtask_id), None)
+        if not existing:
+            raise ValueError(f"Sub-task #{subtask_id} not found")
+
+        remaining = [st for st in subtasks if st.get('id') != subtask_id]
+        remaining = normalize_subtasks(remaining)
+        self.db.update_task(self.username, task.id, {'subtasks': remaining})
+        logger.info(
+            f"Deleted subtask #{subtask_id} from task UUID {task_uuid}")
+
+        await self._trigger_forum_sync()
+        return existing
 
     async def add_subtask(self, task_uuid: str, subtask_name: str):
         """Add a subtask to a task"""
@@ -173,13 +278,22 @@ class TaskService:
         if not task:
             raise ValueError(f"Task with UUID '{task_uuid}' not found")
 
-        # Add new subtask
-        new_subtask = {"name": subtask_name, "completed": False}
+        subtasks = self._normalize_and_save_subtasks_if_needed(task)
+        next_id = max([st.get('id', 0) for st in subtasks], default=0) + 1
+
+        new_subtask = {
+            "id": next_id,
+            "name": subtask_name.strip(),
+            "description": "",
+            "url": "",
+            "completed": False
+        }
         task.subtasks.append(new_subtask)
 
-        self.db.update_task(self.username, task.id, {
-                            'subtasks': task.subtasks})
-        logger.info(f"Added subtask '{subtask_name}' to task UUID {task_uuid}")
+        normalized = normalize_subtasks(task.subtasks)
+        self.db.update_task(self.username, task.id, {'subtasks': normalized})
+        logger.info(
+            f"Added subtask '{subtask_name}' (#{next_id}) to task UUID {task_uuid}")
 
         await self._trigger_forum_sync()
 
@@ -188,6 +302,8 @@ class TaskService:
         task = await self.get_task_by_uuid(task_uuid)
         if not task:
             raise ValueError(f"Task with UUID '{task_uuid}' not found")
+
+        task.subtasks = self._normalize_and_save_subtasks_if_needed(task)
 
         if subtask_index < 0 or subtask_index >= len(task.subtasks):
             raise ValueError(f"Invalid subtask index: {subtask_index}")
@@ -208,6 +324,8 @@ class TaskService:
         task = await self.get_task_by_uuid(task_uuid)
         if not task:
             raise ValueError(f"Task with UUID '{task_uuid}' not found")
+
+        task.subtasks = self._normalize_and_save_subtasks_if_needed(task)
 
         if subtask_index < 0 or subtask_index >= len(task.subtasks):
             raise ValueError(f"Invalid subtask index: {subtask_index}")

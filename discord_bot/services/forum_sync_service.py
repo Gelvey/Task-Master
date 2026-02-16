@@ -66,8 +66,13 @@ class ForumSyncService:
             lines.append("**Sub-tasks:**")
             for idx, subtask in enumerate(task.subtasks, 1):
                 checkbox = "✅" if subtask.get('completed', False) else "☐"
+                subtask_id = subtask.get('id', idx)
                 lines.append(
-                    f"{checkbox} {idx}. {subtask.get('name', 'Unnamed subtask')}")
+                    f"{checkbox} {subtask_id}. {subtask.get('name', 'Unnamed subtask')}")
+                if subtask.get('description'):
+                    lines.append(f"   📝 {subtask.get('description')}")
+                if subtask.get('url'):
+                    lines.append(f"   🔗 {subtask.get('url')}")
 
         return "\n".join(lines)
 

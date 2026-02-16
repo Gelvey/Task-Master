@@ -7,6 +7,7 @@ Discord bot integration for Task-Master task management system. Provides full ta
 - **Persistent Task Board**: Single message per channel displaying all tasks, updated in real-time
 - **Interactive Modals**: Add and edit tasks through Discord popup forms
 - **Thread Configure Modal**: Configure status, priority, owner, deadline, description, and URL in one submit
+- **Sub-task Upsert Command**: Use `/subtask <id>` in a task thread to create or edit sub-task details
 - **Button Controls**: Mark tasks complete, in progress, or delete with button clicks
 - **Status Filtering**: Filter tasks by status using dropdown menus
 - **Priority Levels**: Support for Important, Moderately Important, Not Important priorities
@@ -181,6 +182,22 @@ The task board is a persistent message that displays all tasks grouped by priori
    - **URL**
 4. Submit once to apply all updates
 
+### Managing Sub-tasks in Forum Mode
+
+1. Open the task's forum thread
+2. Run `/subtask` and provide a numeric ID (example: `/subtask 1`)
+3. If the ID exists, the modal opens prefilled for editing
+4. If the ID does not exist, the modal opens as a creation form
+5. Fill and submit:
+   - **Sub-task Name** (required)
+   - **Description** (optional)
+   - **URL** (optional)
+
+6. Use `/subtask-toggle <id>` to mark a sub-task complete/incomplete.
+7. Use `/subtask-delete <id>` to remove a sub-task by ID (requires Confirm/Cancel button confirmation).
+
+Sub-task IDs are stable numeric identifiers shared across clients.
+
 ### Deleting Tasks
 
 1. Click **🗑️ Delete Task** button
@@ -211,6 +228,9 @@ The bot automatically checks for tasks with deadlines approaching within 24 hour
 - `/refresh` - Manually refresh the task board
 - `/taskboard` - (Admin only) Create a new task board in current channel
 - `/configure` - Configure task fields from inside a task thread (forum mode)
+- `/subtask` - Create/edit sub-task by numeric ID inside a task thread (forum mode)
+- `/subtask-toggle` - Toggle completion by numeric sub-task ID (forum mode)
+- `/subtask-delete` - Delete by numeric sub-task ID (forum mode)
 
 **Note**: All commands use Discord's slash command system. Type `/` in Discord to see available commands.
 
