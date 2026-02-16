@@ -132,3 +132,59 @@ class TaskService:
         
         self.db.update_task(self.username, task.id, {'description': description or ""})
         logger.info(f"Updated task description for UUID {task_uuid}")
+    
+    async def _trigger_forum_sync(self):
+        """Helper to trigger forum sync after subtask changes"""
+        from .forum_sync_service import ForumSyncService
+        forum_service = ForumSyncService()
+        if forum_service._bot:
+            await forum_service.sync_from_database()
+    
+    async def add_subtask(self, task_uuid: str, subtask_name: str):
+        """Add a subtask to a task"""
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+        
+        # Add new subtask
+        new_subtask = {"name": subtask_name, "completed": False}
+        task.subtasks.append(new_subtask)
+        
+        self.db.update_task(self.username, task.id, {'subtasks': task.subtasks})
+        logger.info(f"Added subtask '{subtask_name}' to task UUID {task_uuid}")
+        
+        await self._trigger_forum_sync()
+    
+    async def toggle_subtask(self, task_uuid: str, subtask_index: int):
+        """Toggle the completion status of a subtask"""
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+        
+        if subtask_index < 0 or subtask_index >= len(task.subtasks):
+            raise ValueError(f"Invalid subtask index: {subtask_index}")
+        
+        # Toggle completion status
+        task.subtasks[subtask_index]['completed'] = not task.subtasks[subtask_index].get('completed', False)
+        
+        self.db.update_task(self.username, task.id, {'subtasks': task.subtasks})
+        logger.info(f"Toggled subtask {subtask_index} for task UUID {task_uuid}")
+        
+        await self._trigger_forum_sync()
+    
+    async def delete_subtask(self, task_uuid: str, subtask_index: int):
+        """Delete a subtask from a task"""
+        task = await self.get_task_by_uuid(task_uuid)
+        if not task:
+            raise ValueError(f"Task with UUID '{task_uuid}' not found")
+        
+        if subtask_index < 0 or subtask_index >= len(task.subtasks):
+            raise ValueError(f"Invalid subtask index: {subtask_index}")
+        
+        # Delete subtask
+        removed = task.subtasks.pop(subtask_index)
+        
+        self.db.update_task(self.username, task.id, {'subtasks': task.subtasks})
+        logger.info(f"Deleted subtask '{removed.get('name')}' from task UUID {task_uuid}")
+        
+        await self._trigger_forum_sync()

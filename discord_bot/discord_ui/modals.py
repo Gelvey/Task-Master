@@ -273,3 +273,29 @@ class EditDescriptionModal(ui.Modal, title="Edit Task Description"):
             await interaction.response.send_message("✅ Description updated.", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error updating description: {str(e)}", ephemeral=True)
+
+
+class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
+    """Modal for adding a subtask to a task"""
+
+    def __init__(self, task_uuid: str):
+        super().__init__()
+        self.task_uuid = task_uuid
+        
+        self.subtask_name = ui.TextInput(
+            label="Sub-task Name",
+            placeholder="Enter sub-task name...",
+            required=True,
+            max_length=200
+        )
+        self.add_item(self.subtask_name)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from services.task_service import TaskService
+        task_service = TaskService()
+
+        try:
+            await task_service.add_subtask(self.task_uuid, self.subtask_name.value)
+            await interaction.response.send_message(f"✅ Sub-task '{self.subtask_name.value}' added successfully!", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error adding sub-task: {str(e)}", ephemeral=True)

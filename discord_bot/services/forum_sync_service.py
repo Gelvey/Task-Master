@@ -56,8 +56,32 @@ class ForumSyncService:
         ]
         if task.url:
             lines.append(f"**URL:** {task.url}")
+        
+        # Add subtasks section with progress bar
+        if task.subtasks:
+            lines.append("")
+            lines.append(f"**Progress:** {task.progress_bar()}")
+            lines.append("")
+            lines.append("**Sub-tasks:**")
+            for idx, subtask in enumerate(task.subtasks, 1):
+                checkbox = "✅" if subtask.get('completed', False) else "☐"
+                lines.append(f"{checkbox} {idx}. {subtask.get('name', 'Unnamed subtask')}")
+        
         return "\n".join(lines)
 
+    # Priority emoji constants
+    PRIORITY_EMOJIS = {
+        "Important": "🔴",
+        "Moderately Important": "🟠",
+        "Not Important": "⚪",
+        "default": "⚪"
+    }
+    
+    def _get_thread_name_with_priority(self, task):
+        """Generate thread name with priority emoji prefix"""
+        emoji = self.PRIORITY_EMOJIS.get(task.colour, "⚪")
+        return f"{emoji} {task.name}"
+    
     async def sync_from_database(self):
         if not self._bot or Settings.TASK_FORUM_CHANNEL is None:
             return
@@ -98,8 +122,9 @@ class ForumSyncService:
                         thread = None
 
             if not isinstance(thread, discord.Thread):
+                thread_name = self._get_thread_name_with_priority(task)
                 created = await forum_channel.create_thread(
-                    name=task.name,
+                    name=thread_name,
                     content=self._task_content(task)
                 )
                 thread = created.thread
@@ -109,8 +134,9 @@ class ForumSyncService:
                 logger.info(f"Created forum thread for task '{task.name}' ({task_uuid})")
                 continue
 
-            if thread.name != task.name:
-                await thread.edit(name=task.name)
+            thread_name = self._get_thread_name_with_priority(task)
+            if thread.name != thread_name:
+                await thread.edit(name=thread_name)
 
             # Keep latest task snapshot in thread starter message where possible
             content = self._task_content(task)
@@ -127,9 +153,16 @@ class ForumSyncService:
         task_uuid = self.get_task_uuid_for_thread(thread.id)
         if not task_uuid:
             return
+        # Strip priority emoji prefix from thread name before syncing
+        thread_name = thread.name
+        # Remove emoji prefix using PRIORITY_EMOJIS constants
+        for emoji in self.PRIORITY_EMOJIS.values():
+            if thread_name.startswith(emoji):
+                thread_name = thread_name[len(emoji):].strip()
+                break
         from services.task_service import TaskService
         task_service = TaskService()
-        await task_service.update_task_name_by_uuid(task_uuid, thread.name)
+        await task_service.update_task_name_by_uuid(task_uuid, thread_name)
 
     async def update_description_for_thread(self, thread_id: int, description: str):
         task_uuid = self.get_task_uuid_for_thread(thread_id)

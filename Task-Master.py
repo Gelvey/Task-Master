@@ -94,6 +94,7 @@ class Task:
         url="",
         owner="",
         colour="default",
+        subtasks=None,
     ):
         self.name = name
         self.uuid = uuid_value or str(uuid.uuid4())
@@ -104,6 +105,14 @@ class Task:
         self.url = url
         self.owner = owner
         self.colour = colour
+        self.subtasks = subtasks if subtasks is not None else []
+    
+    def progress_percentage(self):
+        """Calculate progress percentage based on completed subtasks"""
+        if not self.subtasks:
+            return 0
+        completed = sum(1 for st in self.subtasks if st.get('completed', False))
+        return int((completed / len(self.subtasks)) * 100) if self.subtasks else 0
 
 
 class LoginScreen(tk.Tk):
@@ -272,6 +281,7 @@ class TaskManager:
                     url=task_data.get("url", ""),
                     owner=task_data.get("owner", ""),
                     colour=task_data.get("colour", "default"),
+                    subtasks=task_data.get("subtasks", []),
                 )
                 tasks.append(task)
 
@@ -298,6 +308,7 @@ class TaskManager:
                 "url": getattr(task, "url", ""),
                 "colour": getattr(task, "colour", "default"),
                 "owner": getattr(task, "owner", ""),
+                "subtasks": getattr(task, "subtasks", []),
             }
 
         if task_to_update is not None:
@@ -1026,11 +1037,13 @@ class TaskDescriptionWindow:
         """
         self.window = tk.Toplevel(master)
         self.window.title("Task Description")
-        self.window.geometry("400x400")
+        self.window.geometry("500x600")
 
-        # Store original values for comparison
+        # Store original values for comparison (deep copy for subtasks)
         self.original_description = task_description or ""
         self.original_url = getattr(task, "url", "")
+        import copy
+        self.original_subtasks = copy.deepcopy(getattr(task, "subtasks", []))
 
         # Main container frame
         main_frame = ttk.Frame(self.window)
@@ -1049,7 +1062,7 @@ class TaskDescriptionWindow:
         description_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Description text area
-        self.description_text = tk.Text(description_frame, wrap=tk.WORD, height=10)
+        self.description_text = tk.Text(description_frame, wrap=tk.WORD, height=6)
         self.description_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # If there's an existing description, insert it
@@ -1067,6 +1080,38 @@ class TaskDescriptionWindow:
         # If there's an existing URL in the task object, insert it
         if hasattr(task, "url"):
             self.url_entry.insert(0, task.url)
+
+        # Subtasks frame
+        subtasks_frame = ttk.LabelFrame(main_frame, text="Sub-tasks", padding=10)
+        subtasks_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Subtasks list with scrollbar
+        subtasks_container = ttk.Frame(subtasks_frame)
+        subtasks_container.pack(fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(subtasks_container)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.subtasks_listbox = tk.Listbox(subtasks_container, yscrollcommand=scrollbar.set, height=6)
+        self.subtasks_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.subtasks_listbox.yview)
+
+        # Load existing subtasks (deep copy)
+        import copy
+        self.subtasks = copy.deepcopy(getattr(task, "subtasks", []))
+        self.update_subtasks_listbox()
+
+        # Subtask controls
+        subtask_controls = ttk.Frame(subtasks_frame)
+        subtask_controls.pack(fill=tk.X, pady=5)
+
+        self.subtask_entry = ttk.Entry(subtask_controls)
+        self.subtask_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        self.subtask_entry.bind("<Return>", lambda e: self.add_subtask())
+
+        ttk.Button(subtask_controls, text="Add", command=self.add_subtask).pack(side=tk.LEFT, padx=2)
+        ttk.Button(subtask_controls, text="Toggle", command=self.toggle_subtask).pack(side=tk.LEFT, padx=2)
+        ttk.Button(subtask_controls, text="Delete", command=self.delete_subtask).pack(side=tk.LEFT, padx=2)
 
         # Buttons frame
         button_frame = ttk.Frame(main_frame)
@@ -1100,7 +1145,7 @@ class TaskDescriptionWindow:
         self.window.geometry(f"+{x}+{y}")
 
         # Set minimum window size
-        self.window.minsize(400, 300)
+        self.window.minsize(500, 500)
 
         # Set focus to description text area
         self.description_text.focus_set()
@@ -1111,6 +1156,42 @@ class TaskDescriptionWindow:
         # Bind text changes to track modifications
         self.description_text.bind("<<Modified>>", self.on_modify)
         self.url_entry.bind("<Key>", self.on_modify)
+    
+    def update_subtasks_listbox(self):
+        """Update the subtasks listbox display"""
+        self.subtasks_listbox.delete(0, tk.END)
+        for idx, subtask in enumerate(self.subtasks):
+            checkbox = "☑" if subtask.get('completed', False) else "☐"
+            display_text = f"{checkbox} {subtask.get('name', 'Unnamed')}"
+            self.subtasks_listbox.insert(tk.END, display_text)
+    
+    def add_subtask(self):
+        """Add a new subtask"""
+        subtask_name = self.subtask_entry.get().strip()
+        if subtask_name:
+            self.subtasks.append({"name": subtask_name, "completed": False})
+            self.update_subtasks_listbox()
+            self.subtask_entry.delete(0, tk.END)
+            self.on_modify()
+    
+    def toggle_subtask(self):
+        """Toggle the completion status of selected subtask"""
+        selection = self.subtasks_listbox.curselection()
+        if selection:
+            idx = selection[0]
+            self.subtasks[idx]['completed'] = not self.subtasks[idx].get('completed', False)
+            self.update_subtasks_listbox()
+            self.subtasks_listbox.selection_set(idx)
+            self.on_modify()
+    
+    def delete_subtask(self):
+        """Delete the selected subtask"""
+        selection = self.subtasks_listbox.curselection()
+        if selection:
+            idx = selection[0]
+            del self.subtasks[idx]
+            self.update_subtasks_listbox()
+            self.on_modify()
 
     def on_modify(self, event=None):
         """Track when changes are made to the form"""
@@ -1124,6 +1205,7 @@ class TaskDescriptionWindow:
         return (
             current_description != self.original_description
             or current_url != self.original_url
+            or self.subtasks != self.original_subtasks
         )
 
     def confirm_close(self):
@@ -1169,6 +1251,7 @@ class TaskDescriptionWindow:
             # Update the task object
             self.task.description = description
             self.task.url = url
+            self.task.subtasks = self.subtasks
 
             # Attempt to save with retry logic
             max_retries = 3
@@ -1191,9 +1274,11 @@ class TaskDescriptionWindow:
             self.status_var.set("Changes saved successfully")
             self.changes_saved = True
 
-            # Update original values
+            # Update original values (deep copy for subtasks)
             self.original_description = description
             self.original_url = url
+            import copy
+            self.original_subtasks = copy.deepcopy(self.subtasks)
 
             # Log successful save
             logging.info(
