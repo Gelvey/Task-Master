@@ -4,6 +4,7 @@ Discord modal forms for task input
 import discord
 from discord import ui
 from typing import Optional
+import logging
 from utils.validators import (
     validate_deadline,
     validate_priority,
@@ -11,6 +12,37 @@ from utils.validators import (
     validate_url,
     format_deadline_for_display,
 )
+
+logger = logging.getLogger(__name__)
+
+
+async def _send_ephemeral_reply(interaction: discord.Interaction, content: str):
+    """Send an ephemeral message safely for modal interactions."""
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(content, ephemeral=True)
+        else:
+            await interaction.response.send_message(content, ephemeral=True)
+    except discord.NotFound:
+        logger.warning("Interaction expired before reply could be sent")
+    except discord.HTTPException as exc:
+        logger.warning("Failed to send interaction reply: %s", exc)
+
+
+async def _defer_ephemeral(interaction: discord.Interaction) -> bool:
+    """Defer a modal interaction safely; returns False if interaction is no longer valid."""
+    if interaction.response.is_done():
+        return True
+
+    try:
+        await interaction.response.defer(ephemeral=True)
+        return True
+    except discord.NotFound:
+        logger.warning("Interaction expired before defer could be sent")
+        return False
+    except discord.HTTPException as exc:
+        logger.warning("Failed to defer interaction: %s", exc)
+        return False
 
 
 class ConfigureTaskModal(ui.Modal, title="Configure Task"):
@@ -118,6 +150,9 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
 
         description = self.description.value if self.description.value is not None else ""
 
+        if not await _defer_ephemeral(interaction):
+            return
+
         task_service = TaskService()
         try:
             await task_service.update_task_by_uuid(
@@ -143,9 +178,9 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
                 dashboard_service.set_database(db_manager)
                 await dashboard_service.update_dashboard()
 
-            await interaction.response.send_message("✅ Task configuration updated.", ephemeral=True)
+            await _send_ephemeral_reply(interaction, "✅ Task configuration updated.")
         except Exception as e:
-            await interaction.response.send_message(f"❌ Error updating task: {str(e)}", ephemeral=True)
+            await _send_ephemeral_reply(interaction, f"❌ Error updating task: {str(e)}")
 
 
 class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
@@ -167,11 +202,14 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
         from services.task_service import TaskService
         task_service = TaskService()
 
+        if not await _defer_ephemeral(interaction):
+            return
+
         try:
             await task_service.add_subtask(self.task_uuid, self.subtask_name.value)
-            await interaction.response.send_message(f"✅ Sub-task '{self.subtask_name.value}' added successfully!", ephemeral=True)
+            await _send_ephemeral_reply(interaction, f"✅ Sub-task '{self.subtask_name.value}' added successfully!")
         except Exception as e:
-            await interaction.response.send_message(f"❌ Error adding sub-task: {str(e)}", ephemeral=True)
+            await _send_ephemeral_reply(interaction, f"❌ Error adding sub-task: {str(e)}")
 
 
 class ConfigureSubtaskModal(ui.Modal):
@@ -236,6 +274,9 @@ class ConfigureSubtaskModal(ui.Modal):
 
         description = (self.subtask_description.value or '').strip()
 
+        if not await _defer_ephemeral(interaction):
+            return
+
         task_service = TaskService()
         try:
             await task_service.upsert_subtask_by_id(
@@ -260,9 +301,6 @@ class ConfigureSubtaskModal(ui.Modal):
                 await dashboard_service.update_dashboard()
 
             action = "updated" if self._is_editing else "created"
-            await interaction.response.send_message(
-                f"✅ Sub-task #{self.subtask_id} {action} successfully.",
-                ephemeral=True,
-            )
+            await _send_ephemeral_reply(interaction, f"✅ Sub-task #{self.subtask_id} {action} successfully.")
         except Exception as e:
-            await interaction.response.send_message(f"❌ Error saving sub-task: {str(e)}", ephemeral=True)
+            await _send_ephemeral_reply(interaction, f"❌ Error saving sub-task: {str(e)}")
