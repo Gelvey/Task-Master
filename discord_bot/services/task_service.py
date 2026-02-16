@@ -59,11 +59,6 @@ class TaskService:
         logger.info(
             f"Added task '{name}' assigned to '{owner}' for user {self.username}")
 
-        # Trigger task board update
-        from .message_updater import MessageUpdater
-        updater = MessageUpdater()
-        await updater.update_all_task_boards()
-
     async def update_task_from_modal(self, task_id: str, name: str, owner: str = "",
                                      deadline: Optional[str] = None, priority: str = "default",
                                      description: str = "", url: str = ""):
@@ -80,11 +75,6 @@ class TaskService:
         logger.info(
             f"Updated task '{task_id}' assigned to '{owner}' for user {self.username}")
 
-        # Trigger task board update
-        from .message_updater import MessageUpdater
-        updater = MessageUpdater()
-        await updater.update_all_task_boards()
-
     async def update_task_status(self, task_name: str, new_status: str):
         """Update task status"""
         task = await self.get_task_by_name(task_name)
@@ -95,11 +85,6 @@ class TaskService:
         logger.info(
             f"Updated task '{task_name}' status to {new_status} for user {self.username}")
 
-        # Trigger task board update
-        from .message_updater import MessageUpdater
-        updater = MessageUpdater()
-        await updater.update_all_task_boards()
-
     async def delete_task(self, task_name: str):
         """Delete a task by name"""
         task = await self.get_task_by_name(task_name)
@@ -108,11 +93,6 @@ class TaskService:
 
         self.db.delete_task(self.username, task.id)
         logger.info(f"Deleted task '{task_name}' for user {self.username}")
-
-        # Trigger task board update
-        from .message_updater import MessageUpdater
-        updater = MessageUpdater()
-        await updater.update_all_task_boards()
 
     async def update_task_name_by_uuid(self, task_uuid: str, new_name: str):
         """Update task name by stable UUID"""
@@ -156,15 +136,9 @@ class TaskService:
         self.db.update_task(self.username, task.id, updates)
         logger.info(f"Updated task fields for UUID {task_uuid}")
 
-        from .message_updater import MessageUpdater
-        updater = MessageUpdater()
-        await updater.update_all_task_boards()
-
     async def _trigger_forum_sync(self):
-        """Helper to trigger forum sync after subtask changes"""
-        from .message_updater import MessageUpdater
-        updater = MessageUpdater()
-        await updater.update_all_task_boards()
+        """Legacy no-op: forum/dashboard sync is triggered by interaction handlers."""
+        return
 
     def _normalize_and_save_subtasks_if_needed(self, task: Task) -> List[dict]:
         normalized = normalize_subtasks(task.subtasks)

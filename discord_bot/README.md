@@ -4,12 +4,9 @@ Discord bot integration for Task-Master task management system. Provides full ta
 
 ## Features
 
-- **Persistent Task Board**: Single message per channel displaying all tasks, updated in real-time
-- **Interactive Modals**: Add and edit tasks through Discord popup forms
+- **Forum-Only Task Management**: One thread per task in the configured forum channel
 - **Thread Configure Modal**: Configure status, priority, owner, deadline, description, and URL in one submit
 - **Sub-task Upsert Command**: Use `/subtask <id>` in a task thread to create or edit sub-task details
-- **Button Controls**: Mark tasks complete, in progress, or delete with button clicks
-- **Status Filtering**: Filter tasks by status using dropdown menus
 - **Priority Levels**: Support for Important, Moderately Important, Not Important priorities
 - **Deadline Reminders**: Automatic notifications for upcoming deadlines (24-hour warning)
 - **Overdue Alerts**: Daily notifications for overdue tasks
@@ -75,9 +72,8 @@ pip install -r requirements.txt
    - `DISCORD_BOT_TOKEN`: Your Discord bot token
    - `TASKMASTER_USERNAME`: Global username for database access (e.g., "gelvey")
    - `OWNERS`: Space-separated list of possible task assignees (e.g., "Circuit Gelvey")
-   - `TASK_CHANNEL`: Legacy task-board channel ID (optional, legacy mode)
-   - `DASHBOARD_CHANNEL`: Read-only dashboard channel for sync/task counts
    - `TASK_FORUM_CHANNEL`: Forum channel ID used for one-thread-per-task sync
+   - `DASHBOARD_CHANNEL`: Read-only dashboard channel for sync/task counts (optional but recommended)
    - `REMINDER_CHANNEL`: Channel ID for deadline reminders
    - `DISCORD_USER_*`: Map Discord user IDs to owners from OWNERS list
    - Firebase credentials (see below)
@@ -141,34 +137,12 @@ python bot.py
 
 The bot should now:
 - Connect to Discord
-- Initialize task boards in configured channels
+- Initialize the forum thread sync and dashboard
 - Sync slash commands
 - Load persisted message IDs and reminder tracking from database
 - Start listening for interactions
 
 ## Usage
-
-### Task Board
-
-The task board is a persistent message that displays all tasks grouped by priority. It updates automatically every minute (configurable).
-
-### Adding Tasks
-
-1. Click **➕ Add Task** button
-2. Fill out the modal form:
-   - **Task Name**: Required
-   - **Deadline**: Optional (format: DD-MM-YYYY HH:MM AM/PM)
-   - **Priority**: Optional (Important, Moderately Important, Not Important, or default)
-   - **Description**: Optional
-   - **URL**: Optional
-3. Click Submit
-
-### Editing Tasks
-
-1. Click **✏️ Edit Task** button
-2. Enter the exact task name
-3. Update fields in the modal
-4. Click Submit
 
 ### Configuring a Task in Forum Mode
 
@@ -198,26 +172,6 @@ The task board is a persistent message that displays all tasks grouped by priori
 
 Sub-task IDs are stable numeric identifiers shared across clients.
 
-### Deleting Tasks
-
-1. Click **🗑️ Delete Task** button
-2. Enter the exact task name
-3. Confirm deletion
-
-### Changing Status
-
-1. Click **✅ Mark Complete** or **🔄 Mark In Progress**
-2. Enter the task name
-3. Task status will update
-
-### Filtering Tasks
-
-Use the dropdown menu at the top of the task board to filter by:
-- All Tasks
-- To Do
-- In Progress
-- Complete
-
 ### Reminders
 
 The bot automatically checks for tasks with deadlines approaching within 24 hours and sends reminders to the configured reminder channel, mentioning the task owner.
@@ -225,8 +179,7 @@ The bot automatically checks for tasks with deadlines approaching within 24 hour
 ## Commands
 
 - `/help` - Show help information
-- `/refresh` - Manually refresh the task board
-- `/taskboard` - (Admin only) Create a new task board in current channel
+- `/refresh` - Manually refresh forum threads and dashboard
 - `/configure` - Configure task fields from inside a task thread (forum mode)
 - `/subtask` - Create/edit sub-task by numeric ID inside a task thread (forum mode)
 - `/subtask-toggle` - Toggle completion by numeric sub-task ID (forum mode)
@@ -247,11 +200,11 @@ discord_bot/
 ├── discord_ui/            # Discord UI components
 │   ├── embeds.py
 │   ├── buttons.py
-│   ├── modals.py
-│   └── select_menus.py
+│   └── modals.py
 ├── services/              # Business logic
 │   ├── task_service.py
-│   ├── message_updater.py
+│   ├── forum_sync_service.py
+│   ├── dashboard_service.py
 │   └── reminder_service.py
 └── utils/                 # Utilities
     ├── logger.py
@@ -263,7 +216,7 @@ discord_bot/
 ### Bot doesn't respond
 
 - Check bot has required permissions in the channel
-- Verify `TASK_CHANNEL` matches the channel ID
+- Verify `TASK_FORUM_CHANNEL` and `DASHBOARD_CHANNEL` are correct
 - Check bot is online (green status in Discord)
 - Review logs in `discord_bot.log`
 
@@ -274,12 +227,12 @@ discord_bot/
 - Ensure Firebase rules allow read/write access
 - Bot can fall back to local JSON storage if Firebase fails
 
-### Task board not updating
+### Forum/dashboard not updating
 
 - Check bot has "Send Messages" and "Embed Links" permissions
-- Verify task board message wasn't deleted
-- Try `/refresh` command to force update
-- Check `TASK_BOARD_REFRESH_INTERVAL` setting
+- Verify `TASK_FORUM_CHANNEL` points to a forum channel
+- Try `/refresh` command to force sync
+- Check `FORUM_SYNC_REFRESH_INTERVAL` setting
 
 ### User mapping not working
 
