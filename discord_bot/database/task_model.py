@@ -10,7 +10,29 @@ Task data model matching the Task-Master schema
 
 def normalize_subtasks(subtasks: Any) -> List[Dict[str, Any]]:
     """Normalize subtask list to stable schema with numeric IDs."""
-    if not isinstance(subtasks, list):
+    if isinstance(subtasks, dict):
+        normalized_input: List[Dict[str, Any]] = []
+
+        def sort_key(key: Any):
+            if isinstance(key, int):
+                return (0, key)
+            if isinstance(key, str) and key.isdigit():
+                return (0, int(key))
+            return (1, str(key))
+
+        for key in sorted(subtasks.keys(), key=sort_key):
+            raw = subtasks[key]
+            if isinstance(raw, dict):
+                subtask = dict(raw)
+                subtask.setdefault('id', key)
+            else:
+                subtask = {
+                    'id': key,
+                    'name': str(raw) if raw is not None else ''
+                }
+            normalized_input.append(subtask)
+        subtasks = normalized_input
+    elif not isinstance(subtasks, list):
         return []
 
     normalized = []

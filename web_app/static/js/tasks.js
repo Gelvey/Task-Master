@@ -22,14 +22,38 @@ const closeModal = document.querySelector('.close');
 const cancelEditBtn = document.getElementById('cancelEdit');
 
 function normalizeSubtaskList(subtasks) {
+    let subtaskList = subtasks;
+
     if (!Array.isArray(subtasks)) {
-        return [];
+        if (subtasks && typeof subtasks === 'object') {
+            const entries = Object.entries(subtasks).sort(([a], [b]) => {
+                const aIsNumeric = /^\d+$/.test(String(a));
+                const bIsNumeric = /^\d+$/.test(String(b));
+
+                if (aIsNumeric && bIsNumeric) {
+                    return parseInt(a, 10) - parseInt(b, 10);
+                }
+                if (aIsNumeric) return -1;
+                if (bIsNumeric) return 1;
+                return String(a).localeCompare(String(b));
+            });
+
+            subtaskList = entries.map(([key, raw]) => {
+                const normalizedRaw = (raw && typeof raw === 'object') ? { ...raw } : { name: String(raw ?? '') };
+                if (normalizedRaw.id === undefined) {
+                    normalizedRaw.id = /^\d+$/.test(String(key)) ? parseInt(key, 10) : key;
+                }
+                return normalizedRaw;
+            });
+        } else {
+            return [];
+        }
     }
 
     const usedIds = new Set();
     let nextId = 1;
 
-    const normalized = subtasks.map((raw) => {
+    const normalized = subtaskList.map((raw) => {
         const subtask = (raw && typeof raw === 'object') ? { ...raw } : { name: String(raw ?? '') };
 
         let id = subtask.id;
@@ -501,13 +525,20 @@ function showTaskModal(taskId) {
         task.subtasks.forEach((st, idx) => {
             const checkbox = st.completed ? '☑' : '☐';
             const subtaskId = st.id || (idx + 1);
-            subtasksHtml += `<li>${checkbox} #${subtaskId} ${escapeHtml(st.name)}</li>`;
-            if (st.description) {
-                subtasksHtml += `<li class="subtask-meta">📝 ${escapeHtml(st.description)}</li>`;
-            }
-            if (st.url) {
-                subtasksHtml += `<li class="subtask-meta">🔗 <a href="${escapeHtml(st.url)}" target="_blank">${escapeHtml(st.url)}</a></li>`;
-            }
+            const descriptionHtml = st.description
+                ? `<div class="subtask-meta">📝 ${escapeHtml(st.description)}</div>`
+                : '';
+            const urlHtml = st.url
+                ? `<div class="subtask-meta">🔗 <a href="${escapeHtml(st.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(st.url)}</a></div>`
+                : '';
+
+            subtasksHtml += `
+                <li class="subtask-item">
+                    <div class="subtask-main">${checkbox} #${subtaskId} ${escapeHtml(st.name)}</div>
+                    ${descriptionHtml}
+                    ${urlHtml}
+                </li>
+            `;
         });
         subtasksHtml += '</ul>';
         subtasksContainer.innerHTML = subtasksHtml;
@@ -832,6 +863,7 @@ async function updateTaskOrder(priority) {
 
 // Utility functions
 function escapeHtml(text) {
+    const safeText = text == null ? '' : String(text);
     const map = {
         '&': '&amp;',
         '<': '&lt;',
@@ -839,7 +871,7 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return safeText.replace(/[&<>"']/g, m => map[m]);
 }
 
 function showError(message) {
