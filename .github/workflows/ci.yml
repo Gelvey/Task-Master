@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  python-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            web_app/requirements.txt
+            discord_bot/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f web_app/requirements.txt ]; then pip install -r web_app/requirements.txt; fi
+          if [ -f discord_bot/requirements.txt ]; then pip install -r discord_bot/requirements.txt; fi
+
+      - name: Validate Python syntax
+        run: |
+          python -m compileall -q Task-Master.py
+          python -m compileall -q web_app
+          python -m compileall -q discord_bot
+
+      - name: Run tests (if present)
+        run: |
+          if find . -type f \( -name "test_*.py" -o -name "*_test.py" \) | grep -q .; then
+            pytest -q
+          else
+            echo "No tests found. Skipping pytest."
+          fi
