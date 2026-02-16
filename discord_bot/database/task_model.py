@@ -105,7 +105,7 @@ class Task:
         if not self.subtasks:
             return 0
         completed = sum(1 for st in self.subtasks if st.get('completed', False))
-        return int((completed / len(self.subtasks)) * 100) if self.subtasks else 0
+        return int((completed / len(self.subtasks)) * 100)
     
     def progress_bar(self, width: int = 10) -> str:
         """Generate a text-based progress bar"""

@@ -1039,10 +1039,11 @@ class TaskDescriptionWindow:
         self.window.title("Task Description")
         self.window.geometry("500x600")
 
-        # Store original values for comparison
+        # Store original values for comparison (deep copy for subtasks)
         self.original_description = task_description or ""
         self.original_url = getattr(task, "url", "")
-        self.original_subtasks = getattr(task, "subtasks", []).copy()
+        import copy
+        self.original_subtasks = copy.deepcopy(getattr(task, "subtasks", []))
 
         # Main container frame
         main_frame = ttk.Frame(self.window)
@@ -1095,8 +1096,9 @@ class TaskDescriptionWindow:
         self.subtasks_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.subtasks_listbox.yview)
 
-        # Load existing subtasks
-        self.subtasks = getattr(task, "subtasks", []).copy()
+        # Load existing subtasks (deep copy)
+        import copy
+        self.subtasks = copy.deepcopy(getattr(task, "subtasks", []))
         self.update_subtasks_listbox()
 
         # Subtask controls
@@ -1272,10 +1274,11 @@ class TaskDescriptionWindow:
             self.status_var.set("Changes saved successfully")
             self.changes_saved = True
 
-            # Update original values
+            # Update original values (deep copy for subtasks)
             self.original_description = description
             self.original_url = url
-            self.original_subtasks = self.subtasks.copy()
+            import copy
+            self.original_subtasks = copy.deepcopy(self.subtasks)
 
             # Log successful save
             logging.info(

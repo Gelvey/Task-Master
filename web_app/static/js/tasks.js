@@ -460,8 +460,8 @@ function editTask(taskId) {
         document.getElementById('deadlineTime').value = date.toTimeString().substring(0, 5);
     }
     
-    // Load subtasks
-    currentSubtasks = (task.subtasks || []).map(st => ({ ...st })); // Deep copy
+    # Load subtasks (use deepcopy for true independence)
+    currentSubtasks = (task.subtasks || []).map(st => JSON.parse(JSON.stringify(st)));
     renderSubtasksList();
     
     cancelEditBtn.style.display = 'inline-block';

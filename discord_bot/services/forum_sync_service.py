@@ -69,15 +69,17 @@ class ForumSyncService:
         
         return "\n".join(lines)
 
+    # Priority emoji constants
+    PRIORITY_EMOJIS = {
+        "Important": "🔴",
+        "Moderately Important": "🟠",
+        "Not Important": "⚪",
+        "default": "⚪"
+    }
+    
     def _get_thread_name_with_priority(self, task):
         """Generate thread name with priority emoji prefix"""
-        priority_emoji_map = {
-            "Important": "🔴",
-            "Moderately Important": "🟠",
-            "Not Important": "⚪",
-            "default": "⚪"
-        }
-        emoji = priority_emoji_map.get(task.colour, "⚪")
+        emoji = self.PRIORITY_EMOJIS.get(task.colour, "⚪")
         return f"{emoji} {task.name}"
     
     async def sync_from_database(self):
@@ -153,8 +155,8 @@ class ForumSyncService:
             return
         # Strip priority emoji prefix from thread name before syncing
         thread_name = thread.name
-        # Remove emoji prefix (🔴, 🟠, ⚪) and any leading whitespace
-        for emoji in ["🔴", "🟠", "⚪"]:
+        # Remove emoji prefix using PRIORITY_EMOJIS constants
+        for emoji in self.PRIORITY_EMOJIS.values():
             if thread_name.startswith(emoji):
                 thread_name = thread_name[len(emoji):].strip()
                 break
