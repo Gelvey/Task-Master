@@ -8,7 +8,7 @@ Discord bot integration for Task-Master task management system. Provides full ta
 - **Thread Configure Modal**: Configure status, priority, owner, deadline, description, and URL in one submit
 - **Sub-task Upsert Command**: Use `/subtask <id>` in a task thread to create or edit sub-task details
 - **Priority Levels**: Support for Important, Moderately Important, Not Important priorities
-- **Priority-First Forum Sync**: Important tasks are treated as critical and pinned to the top of the forum
+- **Priority Search Filters**: Use forum search with emojis (`🔴`, `🟠`, `⚪`) to filter tasks by priority
 - **Deadline Reminders**: Automatic notifications for upcoming deadlines (24-hour warning)
 - **Overdue Alerts**: Daily notifications for overdue tasks
 - **Dynamic Bot Status**: Rotating Discord presence with live task stats
@@ -142,7 +142,6 @@ python bot.py
 The bot should now:
 - Connect to Discord
 - Initialize the forum thread sync and dashboard
-- Pin Important (critical) forum posts to keep them at the top
 - Sync slash commands
 - Load persisted message IDs and reminder tracking from database
 - Start listening for interactions
@@ -160,6 +159,16 @@ The bot should now:
    - **Description**
    - **URL**
 4. Submit once to apply all updates
+
+### Filtering Tasks by Priority in Forum Search
+
+In the task forum's search bar, type one of these emojis to filter tasks by priority:
+
+- `🔴` → Important
+- `🟠` → Moderately Important
+- `⚪` → Not Important / default
+
+This works because task thread titles include these priority emojis.
 
 ### Managing Sub-tasks in Forum Mode
 
@@ -244,7 +253,6 @@ discord_bot/
 ### Forum/dashboard not updating
 
 - Check bot has "Send Messages" and "Embed Links" permissions
-- For critical pinning, also grant "Manage Threads"
 - Verify `TASK_FORUM_CHANNEL` points to a forum channel
 - Try `/refresh` command to force sync
 - Check `FORUM_SYNC_REFRESH_INTERVAL` setting

@@ -244,6 +244,13 @@ async def help_command(interaction: discord.Interaction):
     )
 
     embed.add_field(
+        name="Filter by Priority",
+        value="In the forum search bar, type **🔴** for Important, **🟠** for Moderately Important, "
+              "or **⚪** for Not Important/default tasks.",
+        inline=False
+    )
+
+    embed.add_field(
         name="Manage Sub-tasks",
         value="Use **/subtask <id>** to create/edit, **/subtask-toggle <id>** to toggle completion, "
               "and **/subtask-delete <id>** to delete (with confirmation).",

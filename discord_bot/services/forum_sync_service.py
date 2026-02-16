@@ -11,11 +11,21 @@ logger = logging.getLogger(__name__)
 class ForumSyncService:
     """Synchronize DB tasks to forum threads and back"""
 
+    PRIORITY_EMOJIS = {
+        "Important": "🔴",
+        "Moderately Important": "🟠",
+        "Not Important": "⚪",
+        "default": "⚪",
+    }
+
     def __init__(self):
         self._bot = None
         self._db = None
         self.task_to_thread = {}
         self.thread_to_task = {}
+
+    def _priority_emoji(self, priority: str) -> str:
+        return self.PRIORITY_EMOJIS.get(priority, "⚪")
 
     def set_bot(self, bot):
         self._bot = bot
@@ -47,9 +57,10 @@ class ForumSyncService:
         return self.thread_to_task.get(str(thread_id))
 
     def _task_content(self, task):
+        priority_emoji = self._priority_emoji(task.colour)
         lines = [
             f"**Status:** {task.status}",
-            f"**Priority:** {task.colour}",
+            f"**Priority:** {priority_emoji} {task.colour}",
             f"**Owner:** {task.owner or 'Unassigned'}",
             f"**Deadline:** {task.deadline_display or 'None'}",
             "",
@@ -76,59 +87,13 @@ class ForumSyncService:
 
         return "\n".join(lines)
 
-    # Priority emoji constants
-    PRIORITY_EMOJIS = {
-        "Important": "🔴",
-        "Moderately Important": "🟠",
-        "Not Important": "⚪",
-        "default": "⚪"
-    }
-
-    PRIORITY_SORT_ORDER = {
-        "Important": 0,
-        "Moderately Important": 1,
-        "Not Important": 2,
-        "default": 3,
-    }
-
-    STATUS_SORT_ORDER = {
-        "In Progress": 0,
-        "To Do": 1,
-        "Complete": 2,
-    }
-
-    def _get_thread_name_with_priority(self, task):
-        """Generate thread name with priority emoji prefix"""
-        emoji = self.PRIORITY_EMOJIS.get(task.colour, "⚪")
-        return f"{emoji} {task.name}"
+    def _get_thread_name(self, task):
+        """Generate forum thread name with priority emoji prefix for search filtering."""
+        return f"{self._priority_emoji(task.colour)} {task.name}"
 
     def _task_sort_key(self, task):
-        """Sort key for forum sync ordering: critical first, then active work."""
-        priority_rank = self.PRIORITY_SORT_ORDER.get(task.colour, 99)
-        status_rank = self.STATUS_SORT_ORDER.get(task.status, 99)
-        return (priority_rank, status_rank, task.order, task.name.lower())
-
-    def _is_thread_pinned(self, thread: discord.Thread) -> bool:
-        """Safely determine if a forum thread is currently pinned."""
-        try:
-            return bool(thread.flags and thread.flags.pinned)
-        except Exception:
-            return False
-
-    async def _pin_state_sync(self, thread: discord.Thread, should_pin: bool):
-        """Pin/unpin thread when needed to keep critical tasks at top."""
-        is_pinned = self._is_thread_pinned(thread)
-        if is_pinned == should_pin:
-            return
-
-        try:
-            await thread.edit(pinned=should_pin)
-        except discord.Forbidden:
-            logger.warning(
-                "Missing permission to pin/unpin forum posts. Grant Manage Threads to enable priority pinning.")
-        except Exception as e:
-            logger.warning(
-                f"Failed to update pin state for thread {thread.id}: {e}")
+        """Sort key for forum sync ordering without priority/status weighting."""
+        return (task.order, task.name.lower())
 
     async def sync_from_database(self):
         if not self._bot or Settings.TASK_FORUM_CHANNEL is None:
@@ -173,13 +138,12 @@ class ForumSyncService:
                         thread = None
 
             if not isinstance(thread, discord.Thread):
-                thread_name = self._get_thread_name_with_priority(task)
+                thread_name = self._get_thread_name(task)
                 created = await forum_channel.create_thread(
                     name=thread_name,
                     content=self._task_content(task)
                 )
                 thread = created.thread
-                await self._pin_state_sync(thread, task.colour == "Important")
                 self.task_to_thread[task_uuid] = str(thread.id)
                 self.thread_to_task[str(thread.id)] = task_uuid
                 self._save_mappings()
@@ -187,17 +151,13 @@ class ForumSyncService:
                     f"Created forum thread for task '{task.name}' ({task_uuid})")
                 continue
 
-            thread_name = self._get_thread_name_with_priority(task)
-            should_pin = task.colour == "Important"
-            if thread.name != thread_name or self._is_thread_pinned(thread) != should_pin:
+            thread_name = self._get_thread_name(task)
+            if thread.name != thread_name:
                 try:
-                    await thread.edit(name=thread_name, pinned=should_pin)
-                except TypeError:
                     await thread.edit(name=thread_name)
-                    await self._pin_state_sync(thread, should_pin)
                 except discord.Forbidden:
                     logger.warning(
-                        "Missing permission to rename/pin forum posts. Grant Manage Threads to fully sync priority ordering.")
+                        "Missing permission to rename forum posts. Grant Manage Threads to keep names synced.")
                 except Exception as e:
                     logger.warning(
                         f"Failed to update thread metadata for {thread.id}: {e}")
@@ -217,12 +177,11 @@ class ForumSyncService:
         task_uuid = self.get_task_uuid_for_thread(thread.id)
         if not task_uuid:
             return
-        # Strip priority emoji prefix from thread name before syncing
         thread_name = thread.name
-        # Remove emoji prefix using PRIORITY_EMOJIS constants
-        for emoji in self.PRIORITY_EMOJIS.values():
-            if thread_name.startswith(emoji):
-                thread_name = thread_name[len(emoji):].strip()
+        for emoji in set(self.PRIORITY_EMOJIS.values()):
+            prefix = f"{emoji} "
+            if thread_name.startswith(prefix):
+                thread_name = thread_name[len(prefix):]
                 break
         from services.task_service import TaskService
         task_service = TaskService()
