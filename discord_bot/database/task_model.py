@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
-s"""
+"""
 Task data model matching the Task-Master schema
 """
 
