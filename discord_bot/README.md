@@ -6,6 +6,7 @@ Discord bot integration for Task-Master task management system. Provides full ta
 
 - **Persistent Task Board**: Single message per channel displaying all tasks, updated in real-time
 - **Interactive Modals**: Add and edit tasks through Discord popup forms
+- **Thread Configure Modal**: Configure status, priority, owner, deadline, description, and URL in one submit
 - **Button Controls**: Mark tasks complete, in progress, or delete with button clicks
 - **Status Filtering**: Filter tasks by status using dropdown menus
 - **Priority Levels**: Support for Important, Moderately Important, Not Important priorities
@@ -155,7 +156,7 @@ The task board is a persistent message that displays all tasks grouped by priori
 1. Click **➕ Add Task** button
 2. Fill out the modal form:
    - **Task Name**: Required
-   - **Deadline**: Optional (format: YYYY-MM-DD HH:MM)
+   - **Deadline**: Optional (format: DD-MM-YYYY HH:MM AM/PM)
    - **Priority**: Optional (Important, Moderately Important, Not Important, or default)
    - **Description**: Optional
    - **URL**: Optional
@@ -167,6 +168,18 @@ The task board is a persistent message that displays all tasks grouped by priori
 2. Enter the exact task name
 3. Update fields in the modal
 4. Click Submit
+
+### Configuring a Task in Forum Mode
+
+1. Open the task's forum thread
+2. Run `/configure`
+3. Update all fields in one modal:
+   - **Status / Priority** (example: `In Progress / Important`)
+   - **Owner**
+   - **Deadline** (format: `DD-MM-YYYY HH:MM AM/PM`, e.g. `16-02-2026 09:30 PM`)
+   - **Description**
+   - **URL**
+4. Submit once to apply all updates
 
 ### Deleting Tasks
 
@@ -197,7 +210,7 @@ The bot automatically checks for tasks with deadlines approaching within 24 hour
 - `/help` - Show help information
 - `/refresh` - Manually refresh the task board
 - `/taskboard` - (Admin only) Create a new task board in current channel
-- `/description` - Edit task description from inside a task thread (forum mode)
+- `/configure` - Configure task fields from inside a task thread (forum mode)
 
 **Note**: All commands use Discord's slash command system. Type `/` in Discord to see available commands.
 
@@ -245,7 +258,7 @@ discord_bot/
 
 - Check bot has "Send Messages" and "Embed Links" permissions
 - Verify task board message wasn't deleted
-- Try `!refresh` command to force update
+- Try `/refresh` command to force update
 - Check `TASK_BOARD_REFRESH_INTERVAL` setting
 
 ### User mapping not working

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from datetime import datetime
 import uuid
+from utils.validators import parse_deadline, format_deadline_for_display
 
 
 @dataclass
@@ -19,9 +20,11 @@ class Task:
     description: str = ""
     url: str = ""
     owner: str = ""
-    colour: str = "default"  # Priority: default, Important, Moderately Important, Not Important
-    subtasks: list = field(default_factory=list)  # List of subtask dictionaries
-    
+    # Priority: default, Important, Moderately Important, Not Important
+    colour: str = "default"
+    # List of subtask dictionaries
+    subtasks: list = field(default_factory=list)
+
     def to_dict(self):
         """Convert task to dictionary for database storage"""
         return {
@@ -36,9 +39,9 @@ class Task:
             'colour': self.colour,
             'subtasks': self.subtasks
         }
-    
+
     @classmethod
-    def from_dict(cls, data: dict, task_id: str = None):
+    def from_dict(cls, data: dict, task_id: Optional[str] = None):
         """Create Task from database dictionary"""
         task_uuid = data.get('uuid') or str(uuid.uuid4())
         return cls(
@@ -54,30 +57,26 @@ class Task:
             colour=data.get('colour', 'default'),
             subtasks=data.get('subtasks', [])
         )
-    
+
     @property
     def deadline_datetime(self) -> Optional[datetime]:
         """Parse deadline string to datetime object"""
         if not self.deadline:
             return None
-        try:
-            # Try parsing various formats
-            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"]:
-                try:
-                    return datetime.strptime(self.deadline, fmt)
-                except ValueError:
-                    continue
-            return None
-        except Exception:
-            return None
-    
+        return parse_deadline(self.deadline)
+
+    @property
+    def deadline_display(self) -> str:
+        """Human-readable deadline for Discord UI."""
+        return format_deadline_for_display(self.deadline)
+
     @property
     def is_overdue(self) -> bool:
         """Check if task is overdue"""
         if not self.deadline_datetime:
             return False
         return datetime.now() > self.deadline_datetime and self.status != "Complete"
-    
+
     @property
     def priority_emoji(self) -> str:
         """Get emoji for priority level"""
@@ -88,7 +87,7 @@ class Task:
             "default": "⚪"
         }
         return priority_map.get(self.colour, "⚪")
-    
+
     @property
     def status_emoji(self) -> str:
         """Get emoji for task status"""
@@ -98,15 +97,16 @@ class Task:
             "Complete": "✅"
         }
         return status_map.get(self.status, "❓")
-    
+
     @property
     def progress_percentage(self) -> int:
         """Calculate progress percentage based on completed subtasks"""
         if not self.subtasks:
             return 0
-        completed = sum(1 for st in self.subtasks if st.get('completed', False))
+        completed = sum(
+            1 for st in self.subtasks if st.get('completed', False))
         return int((completed / len(self.subtasks)) * 100)
-    
+
     def progress_bar(self, width: int = 10) -> str:
         """Generate a text-based progress bar"""
         if not self.subtasks:

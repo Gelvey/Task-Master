@@ -44,6 +44,8 @@ Task-Master is a desktop application built with Python and Tkinter GUI toolkit. 
 
 - The application uses a graphical user interface (GUI) built with Tkinter.
 - Task data is stored in a Firebase Realtime Database, ensuring data persistence across devices and sessions.
+- In Discord forum mode, use `/configure` inside a task thread to update status, priority, owner, deadline, description, and URL in one modal.
+- Discord deadline display/input format is `DD-MM-YYYY hh:mm AM/PM` (example: `16-02-2026 09:30 PM`).
 - The application logs activity to a file named `task_manager.log` in the same directory as the script.
 - Tooltips are provided for input fields to guide users on their usage.
 

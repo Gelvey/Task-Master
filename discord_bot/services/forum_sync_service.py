@@ -38,7 +38,8 @@ class ForumSyncService:
         if not self._db:
             return
         try:
-            self._db.save_task_thread_mappings(self.task_to_thread, self.thread_to_task)
+            self._db.save_task_thread_mappings(
+                self.task_to_thread, self.thread_to_task)
         except Exception as e:
             logger.error(f"Failed to save forum mappings: {e}")
 
@@ -50,13 +51,13 @@ class ForumSyncService:
             f"**Status:** {task.status}",
             f"**Priority:** {task.colour}",
             f"**Owner:** {task.owner or 'Unassigned'}",
-            f"**Deadline:** {task.deadline or 'None'}",
+            f"**Deadline:** {task.deadline_display or 'None'}",
             "",
             f"**Description:** {task.description or '*No description*'}",
         ]
         if task.url:
             lines.append(f"**URL:** {task.url}")
-        
+
         # Add subtasks section with progress bar
         if task.subtasks:
             lines.append("")
@@ -65,8 +66,9 @@ class ForumSyncService:
             lines.append("**Sub-tasks:**")
             for idx, subtask in enumerate(task.subtasks, 1):
                 checkbox = "✅" if subtask.get('completed', False) else "☐"
-                lines.append(f"{checkbox} {idx}. {subtask.get('name', 'Unnamed subtask')}")
-        
+                lines.append(
+                    f"{checkbox} {idx}. {subtask.get('name', 'Unnamed subtask')}")
+
         return "\n".join(lines)
 
     # Priority emoji constants
@@ -76,19 +78,20 @@ class ForumSyncService:
         "Not Important": "⚪",
         "default": "⚪"
     }
-    
+
     def _get_thread_name_with_priority(self, task):
         """Generate thread name with priority emoji prefix"""
         emoji = self.PRIORITY_EMOJIS.get(task.colour, "⚪")
         return f"{emoji} {task.name}"
-    
+
     async def sync_from_database(self):
         if not self._bot or Settings.TASK_FORUM_CHANNEL is None:
             return
 
         forum_channel = self._bot.get_channel(Settings.TASK_FORUM_CHANNEL)
         if not isinstance(forum_channel, discord.ForumChannel):
-            logger.warning(f"Channel {Settings.TASK_FORUM_CHANNEL} is not a forum channel")
+            logger.warning(
+                f"Channel {Settings.TASK_FORUM_CHANNEL} is not a forum channel")
             return
 
         from services.task_service import TaskService
@@ -99,10 +102,11 @@ class ForumSyncService:
             # Keep migration-safe fallback for legacy tasks while UUID backfill propagates.
             task_uuid = task.uuid or task.id or task.name
             if not task.uuid:
-                logger.warning(f"Task '{task.name}' missing UUID during forum sync; using legacy fallback key.")
+                logger.warning(
+                    f"Task '{task.name}' missing UUID during forum sync; using legacy fallback key.")
             thread = None
             thread_id = self.task_to_thread.get(task_uuid)
-            
+
             # Migrate old mapping keys (name/id) to UUID to avoid duplicate thread creation.
             if not thread_id:
                 for legacy_key in [task.id, task.name]:
@@ -131,7 +135,8 @@ class ForumSyncService:
                 self.task_to_thread[task_uuid] = str(thread.id)
                 self.thread_to_task[str(thread.id)] = task_uuid
                 self._save_mappings()
-                logger.info(f"Created forum thread for task '{task.name}' ({task_uuid})")
+                logger.info(
+                    f"Created forum thread for task '{task.name}' ({task_uuid})")
                 continue
 
             thread_name = self._get_thread_name_with_priority(task)
