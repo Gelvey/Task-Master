@@ -89,6 +89,18 @@
                 </div>
             </div>
             
+            <div class="form-row">
+                <div class="form-group flex-1">
+                    <label>Sub-tasks:</label>
+                    <div id="subtasksList" class="subtasks-editor"></div>
+                    <div class="subtask-add-control">
+                        <input type="text" id="newSubtask" class="form-control" 
+                               placeholder="Add a sub-task" />
+                        <button type="button" id="addSubtaskBtn" class="btn btn-sm btn-secondary">Add</button>
+                    </div>
+                </div>
+            </div>
+            
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add Task</button>
                 <button type="button" id="cancelEdit" class="btn btn-secondary" style="display: none;">Cancel Edit</button>
@@ -125,6 +137,10 @@
             <p><strong>Description:</strong></p>
             <p id="modalDescription" class="description-text"></p>
             <p><strong>URL:</strong> <a id="modalUrl" href="#" target="_blank"></a></p>
+            
+            <div id="modalSubtasks" style="display: none;">
+                <p><strong>Sub-tasks:</strong></p>
+            </div>
             
             <div class="modal-actions">
                 <button class="btn btn-primary" id="editTaskBtn">Edit</button>

@@ -3,6 +3,7 @@
 let tasks = [];
 let currentFilter = 'all';
 let editingTaskId = null;
+let currentSubtasks = []; // Track subtasks in the form
 
 const PRIORITY_RANK = {
     'Important': 3,
@@ -38,6 +39,15 @@ function setupEventListeners() {
         });
     });
     
+    // Subtask management
+    document.getElementById('addSubtaskBtn').addEventListener('click', addSubtaskToForm);
+    document.getElementById('newSubtask').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addSubtaskToForm();
+        }
+    });
+    
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -63,9 +73,54 @@ function setupEventListeners() {
     cancelEditBtn.addEventListener('click', () => {
         editingTaskId = null;
         taskForm.reset();
+        currentSubtasks = [];
+        renderSubtasksList();
         cancelEditBtn.style.display = 'none';
         document.querySelector('.task-form h2').textContent = 'Add New Task';
     });
+}
+
+// Subtask management functions
+function addSubtaskToForm() {
+    const input = document.getElementById('newSubtask');
+    const subtaskName = input.value.trim();
+    if (subtaskName) {
+        currentSubtasks.push({ name: subtaskName, completed: false });
+        input.value = '';
+        renderSubtasksList();
+    }
+}
+
+function renderSubtasksList() {
+    const container = document.getElementById('subtasksList');
+    if (currentSubtasks.length === 0) {
+        container.innerHTML = '<p class="empty-subtasks">No sub-tasks added yet.</p>';
+        return;
+    }
+    
+    let html = '<ul class="subtasks-form-list">';
+    currentSubtasks.forEach((st, idx) => {
+        const checkbox = st.completed ? '☑' : '☐';
+        html += `
+            <li>
+                <span class="subtask-checkbox" onclick="toggleSubtaskInForm(${idx})">${checkbox}</span>
+                <span class="subtask-name">${escapeHtml(st.name)}</span>
+                <button type="button" class="btn-subtask-delete" onclick="deleteSubtaskFromForm(${idx})">✕</button>
+            </li>
+        `;
+    });
+    html += '</ul>';
+    container.innerHTML = html;
+}
+
+function toggleSubtaskInForm(index) {
+    currentSubtasks[index].completed = !currentSubtasks[index].completed;
+    renderSubtasksList();
+}
+
+function deleteSubtaskFromForm(index) {
+    currentSubtasks.splice(index, 1);
+    renderSubtasksList();
 }
 
 // Load tasks from API
@@ -157,10 +212,27 @@ function createTaskElement(task) {
     const deadline = formatDeadline(task.deadline);
     const isOverdue = isTaskOverdue(task);
     
+    // Calculate progress if subtasks exist
+    let progressHtml = '';
+    if (task.subtasks && task.subtasks.length > 0) {
+        const completed = task.subtasks.filter(st => st.completed).length;
+        const total = task.subtasks.length;
+        const percentage = Math.round((completed / total) * 100);
+        progressHtml = `
+            <div class="task-progress">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                </div>
+                <span class="progress-text">${completed}/${total} sub-tasks (${percentage}%)</span>
+            </div>
+        `;
+    }
+    
     return `
         <div class="task-item ${priorityClass}" data-task-id="${task.id}" data-priority="${task.colour}" draggable="true">
             <div class="task-info">
                 <div class="task-name">${escapeHtml(task.name)}</div>
+                ${progressHtml}
                 <div class="task-meta">
                     <span class="task-status status-${statusClass}">${task.status}</span>
                     ${deadline ? `<span class="task-deadline ${isOverdue ? 'overdue' : ''}">📅 ${deadline}</span>` : ''}
@@ -227,7 +299,8 @@ async function handleTaskSubmit(e) {
         owner: taskOwner,
         description: taskDescription,
         url: taskUrl,
-        deadline: deadline
+        deadline: deadline,
+        subtasks: currentSubtasks
     };
     
     try {
@@ -254,6 +327,8 @@ async function handleTaskSubmit(e) {
             await loadTasks();
             taskForm.reset();
             editingTaskId = null;
+            currentSubtasks = [];
+            renderSubtasksList();
             cancelEditBtn.style.display = 'none';
             document.querySelector('.task-form h2').textContent = 'Add New Task';
         } else {
@@ -329,6 +404,21 @@ function showTaskModal(taskId) {
         urlLink.style.display = 'none';
     }
     
+    // Render subtasks if available
+    const subtasksContainer = document.getElementById('modalSubtasks');
+    if (task.subtasks && task.subtasks.length > 0) {
+        let subtasksHtml = '<ul class="subtasks-list">';
+        task.subtasks.forEach((st, idx) => {
+            const checkbox = st.completed ? '☑' : '☐';
+            subtasksHtml += `<li>${checkbox} ${escapeHtml(st.name)}</li>`;
+        });
+        subtasksHtml += '</ul>';
+        subtasksContainer.innerHTML = subtasksHtml;
+        subtasksContainer.style.display = 'block';
+    } else {
+        subtasksContainer.style.display = 'none';
+    }
+    
     // Edit button
     document.getElementById('editTaskBtn').onclick = () => {
         editTask(taskId);
@@ -369,6 +459,10 @@ function editTask(taskId) {
         document.getElementById('deadlineDate').value = date.toISOString().split('T')[0];
         document.getElementById('deadlineTime').value = date.toTimeString().substring(0, 5);
     }
+    
+    // Load subtasks
+    currentSubtasks = (task.subtasks || []).map(st => ({ ...st })); // Deep copy
+    renderSubtasksList();
     
     cancelEditBtn.style.display = 'inline-block';
     document.querySelector('.task-form h2').textContent = 'Edit Task';
