@@ -106,6 +106,7 @@ class ForumSyncService:
             return
 
         from services.task_service import TaskService
+        from discord_ui.buttons import TaskView
         task_service = TaskService()
         tasks = task_service.get_all_tasks()
         tasks = sorted(tasks, key=self._task_sort_key)
@@ -137,11 +138,17 @@ class ForumSyncService:
                     except Exception:
                         thread = None
 
+            # Build a persistent TaskView for this task and register it so button
+            # interactions survive bot restarts.
+            task_view = TaskView(task_uuid=task_uuid, subtasks=task.subtasks or [])
+            self._bot.add_view(task_view)
+
             if not isinstance(thread, discord.Thread):
                 thread_name = self._get_thread_name(task)
                 created = await forum_channel.create_thread(
                     name=thread_name,
-                    content=self._task_content(task)
+                    content=self._task_content(task),
+                    view=task_view,
                 )
                 thread = created.thread
                 self.task_to_thread[task_uuid] = str(thread.id)
@@ -167,10 +174,10 @@ class ForumSyncService:
             try:
                 starter_message = await thread.fetch_message(thread.id)
                 if starter_message.content != content:
-                    await starter_message.edit(content=content)
+                    await starter_message.edit(content=content, view=task_view)
             except Exception:
                 # Fallback: post one sync snapshot if starter message isn't accessible
-                await thread.send(content)
+                await thread.send(content, view=task_view)
 
     async def handle_thread_rename(self, thread: discord.Thread):
         """Sync thread title changes back to database task name"""
