@@ -3,160 +3,210 @@
 {% block title %}Task-Master - Tasks{% endblock %}
 
 {% block content %}
-<div class="tasks-container">
+<div class="app-shell">
+    <!-- Top Navigation Bar -->
     <header class="app-header">
-        <h1>Task-Master</h1>
-        <div class="user-info">
-            <span class="username">{{ username }}</span>
-            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm">Logout</a>
+        <div class="header-left">
+            <i class="fa-solid fa-list-check header-icon"></i>
+            <h1>Task-Master</h1>
+        </div>
+        <div class="header-right">
+            <span class="username"><i class="fa-solid fa-user"></i> {{ username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm" title="Logout">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </a>
         </div>
     </header>
 
-    <div class="task-form">
-        <h2>Add New Task</h2>
-        <form id="taskForm">
-            <div class="form-row">
-                <div class="form-group flex-2">
-                    <label for="taskName">Task Name:</label>
-                    <input type="text" id="taskName" class="form-control" placeholder="Enter task name" required>
-                </div>
+    <main class="app-main">
+        <!-- Task Form Panel (collapsible) -->
+        <section class="task-form-panel" id="taskFormPanel">
+            <button class="panel-toggle" id="formToggle" type="button">
+                <span class="panel-toggle-label">
+                    <i class="fa-solid fa-plus"></i> <span id="formToggleText">Add New Task</span>
+                </span>
+                <i class="fa-solid fa-chevron-down panel-toggle-icon" id="formToggleIcon"></i>
+            </button>
+            <div class="panel-body" id="formPanelBody">
+                <form id="taskForm">
+                    <div class="form-grid">
+                        <div class="form-group form-span-2">
+                            <label for="taskName">Task Name <span class="required-mark">*</span></label>
+                            <input type="text" id="taskName" class="form-control" placeholder="What needs to be done?" required>
+                        </div>
 
-                <div class="form-group">
-                    <label for="taskStatus">Status:</label>
-                    <select id="taskStatus" class="form-control">
-                        <option value="To Do">To Do</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Complete">Complete</option>
-                    </select>
-                </div>
-            </div>
+                        <div class="form-group">
+                            <label for="taskStatus">Status</label>
+                            <select id="taskStatus" class="form-control">
+                                <option value="To Do">To Do</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Complete">Complete</option>
+                            </select>
+                        </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="hasDeadline"> Has Deadline
-                    </label>
-                </div>
+                        <div class="form-group">
+                            <label for="taskColour">Priority</label>
+                            <select id="taskColour" class="form-control">
+                                {% for key, value in colour_options.items() %}
+                                <option value="{{ key }}">{{ value.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-                <div class="form-group deadline-inputs" style="display: none;">
-                    <label for="deadlineDate">Deadline Date:</label>
-                    <input type="date" id="deadlineDate" class="form-control">
-                </div>
+                        {% if owners %}
+                        <div class="form-group">
+                            <label for="taskOwner">Owner</label>
+                            <select id="taskOwner" class="form-control">
+                                <option value="">Unassigned</option>
+                                {% for owner in owners %}
+                                <option value="{{ owner }}">{{ owner }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
 
-                <div class="form-group deadline-inputs" style="display: none;">
-                    <label for="deadlineTime">Deadline Time:</label>
-                    <input type="time" id="deadlineTime" class="form-control">
-                </div>
-            </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="hasDeadline">
+                                <span>Has Deadline</span>
+                            </label>
+                        </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="taskColour">Priority:</label>
-                    <select id="taskColour" class="form-control">
-                        {% for key, value in colour_options.items() %}
-                        <option value="{{ key }}">{{ value.label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                        <div class="form-group deadline-inputs" style="display: none;">
+                            <label for="deadlineDate">Date</label>
+                            <input type="date" id="deadlineDate" class="form-control">
+                        </div>
 
-                {% if owners %}
-                <div class="form-group">
-                    <label for="taskOwner">Owner:</label>
-                    <select id="taskOwner" class="form-control">
-                        <option value="">None</option>
-                        {% for owner in owners %}
-                        <option value="{{ owner }}">{{ owner }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-            </div>
+                        <div class="form-group deadline-inputs" style="display: none;">
+                            <label for="deadlineTime">Time</label>
+                            <input type="time" id="deadlineTime" class="form-control">
+                        </div>
 
-            <div class="form-row">
-                <div class="form-group flex-1">
-                    <label for="taskDescription">Description:</label>
-                    <textarea id="taskDescription" class="form-control" rows="2"
-                        placeholder="Task description (optional)"></textarea>
-                </div>
-            </div>
+                        <div class="form-group form-span-full">
+                            <label for="taskDescription">Description</label>
+                            <textarea id="taskDescription" class="form-control" rows="2"
+                                placeholder="Add details about this task (optional)"></textarea>
+                        </div>
 
-            <div class="form-row">
-                <div class="form-group flex-1">
-                    <label for="taskUrl">URL:</label>
-                    <input type="url" id="taskUrl" class="form-control" placeholder="https://example.com (optional)">
-                </div>
-            </div>
+                        <div class="form-group form-span-full">
+                            <label for="taskUrl">URL</label>
+                            <input type="url" id="taskUrl" class="form-control" placeholder="https://example.com (optional)">
+                        </div>
 
-            <div class="form-row">
-                <div class="form-group flex-1">
-                    <label>Sub-tasks:</label>
-                    <div id="subtasksList" class="subtasks-editor"></div>
-                    <div class="subtask-add-control">
-                        <input type="text" id="newSubtask" class="form-control" placeholder="Add a sub-task" />
-                        <input type="text" id="newSubtaskDescription" class="form-control"
-                            placeholder="Sub-task description (optional)" />
-                        <input type="url" id="newSubtaskUrl" class="form-control"
-                            placeholder="https://example.com (optional)" />
-                        <button type="button" id="addSubtaskBtn" class="btn btn-sm btn-secondary">Add</button>
+                        <div class="form-group form-span-full">
+                            <label>Sub-tasks</label>
+                            <div id="subtasksList" class="subtasks-editor"></div>
+                            <div class="subtask-add-control">
+                                <input type="text" id="newSubtask" class="form-control" placeholder="Add a sub-task" />
+                                <input type="text" id="newSubtaskDescription" class="form-control"
+                                    placeholder="Description (optional)" />
+                                <input type="url" id="newSubtaskUrl" class="form-control"
+                                    placeholder="URL (optional)" />
+                                <button type="button" id="addSubtaskBtn" class="btn btn-secondary btn-sm">
+                                    <i class="fa-solid fa-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
                     </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="submitTaskBtn">
+                            <i class="fa-solid fa-plus"></i> Add Task
+                        </button>
+                        <button type="button" id="cancelEdit" class="btn btn-ghost" style="display: none;">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Task List Section -->
+        <section class="task-list-section">
+            <div class="section-toolbar">
+                <h2><i class="fa-solid fa-clipboard-list"></i> Your Tasks</h2>
+                <div class="filter-buttons" role="tablist">
+                    <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">All</button>
+                    <button class="filter-btn" data-filter="To Do" role="tab">
+                        <i class="fa-solid fa-circle status-icon-todo"></i> To Do
+                    </button>
+                    <button class="filter-btn" data-filter="In Progress" role="tab">
+                        <i class="fa-solid fa-circle status-icon-inprogress"></i> In Progress
+                    </button>
+                    <button class="filter-btn" data-filter="Complete" role="tab">
+                        <i class="fa-solid fa-circle status-icon-complete"></i> Complete
+                    </button>
                 </div>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Add Task</button>
-                <button type="button" id="cancelEdit" class="btn btn-secondary" style="display: none;">Cancel
-                    Edit</button>
+            <div id="taskList" class="task-list">
+                <div class="loading-state">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <p>Loading tasks...</p>
+                </div>
             </div>
-        </form>
-    </div>
-
-    <div class="task-list-section">
-        <h2>Your Tasks</h2>
-
-        <div class="filter-buttons">
-            <button class="btn btn-sm filter-btn active" data-filter="all">All</button>
-            <button class="btn btn-sm filter-btn" data-filter="To Do">To Do</button>
-            <button class="btn btn-sm filter-btn" data-filter="In Progress">In Progress</button>
-            <button class="btn btn-sm filter-btn" data-filter="Complete">Complete</button>
-        </div>
-
-        <div id="taskList" class="task-list">
-            <p class="loading">Loading tasks...</p>
-        </div>
-    </div>
+        </section>
+    </main>
 </div>
 
 <!-- Task Detail Modal -->
-<div id="taskModal" class="modal">
+<div id="taskModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
     <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2 id="modalTaskName"></h2>
+        <button class="modal-close close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        <h2 id="modalTaskName" class="modal-title"></h2>
         <div class="modal-body">
-            <p><strong>Status:</strong> <span id="modalStatus"></span></p>
-            <p><strong>Deadline:</strong> <span id="modalDeadline"></span></p>
-            <p><strong>Priority:</strong> <span id="modalPriority"></span></p>
-            <p><strong>Owner:</strong> <span id="modalOwner"></span></p>
-            <p><strong>Description:</strong></p>
-            <p id="modalDescription" class="description-text"></p>
-            <p><strong>URL:</strong> <a id="modalUrl" href="#" target="_blank"></a></p>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label"><i class="fa-solid fa-signal"></i> Status</span>
+                    <span id="modalStatus" class="detail-value"></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label"><i class="fa-regular fa-calendar"></i> Deadline</span>
+                    <span id="modalDeadline" class="detail-value"></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label"><i class="fa-solid fa-flag"></i> Priority</span>
+                    <span id="modalPriority" class="detail-value"></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label"><i class="fa-solid fa-user"></i> Owner</span>
+                    <span id="modalOwner" class="detail-value"></span>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <span class="detail-label"><i class="fa-solid fa-align-left"></i> Description</span>
+                <div id="modalDescription" class="description-text"></div>
+            </div>
+
+            <div class="detail-section" id="modalUrlSection" style="display:none;">
+                <span class="detail-label"><i class="fa-solid fa-link"></i> URL</span>
+                <a id="modalUrl" href="#" target="_blank" class="detail-link"></a>
+            </div>
 
             <div id="modalSubtasks" style="display: none;">
-                <p><strong>Sub-tasks:</strong></p>
+                <span class="detail-label"><i class="fa-solid fa-list-check"></i> Sub-tasks</span>
             </div>
 
             <div class="modal-actions">
-                <button class="btn btn-primary" id="editTaskBtn">Edit</button>
-                <button class="btn btn-danger" id="deleteTaskBtn">Delete</button>
+                <button class="btn btn-primary" id="editTaskBtn">
+                    <i class="fa-solid fa-pen-to-square"></i> Edit
+                </button>
+                <button class="btn btn-danger" id="deleteTaskBtn">
+                    <i class="fa-solid fa-trash-can"></i> Delete
+                </button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Sub-task Edit Modal -->
-<div id="subtaskEditModal" class="modal">
+<div id="subtaskEditModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
     <div class="modal-content subtask-edit-modal-content">
-        <span class="close" id="subtaskModalClose">&times;</span>
-        <h2 id="subtaskModalTitle">Edit Sub-task</h2>
+        <button class="modal-close" id="subtaskModalClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        <h2 id="subtaskModalTitle" class="modal-title">Edit Sub-task</h2>
         <div class="modal-body">
             <div class="form-group">
                 <label for="subtaskEditName">Name <span class="required-mark">*</span></label>
@@ -175,29 +225,38 @@
                     placeholder="https://example.com (optional)">
             </div>
             <div class="modal-actions">
-                <button type="button" class="btn btn-primary" id="subtaskEditSaveBtn">Save</button>
-                <button type="button" class="btn btn-secondary" id="subtaskEditCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="subtaskEditSaveBtn">
+                    <i class="fa-solid fa-check"></i> Save
+                </button>
+                <button type="button" class="btn btn-ghost" id="subtaskEditCancelBtn">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Confirm Delete Modal -->
-<div id="confirmModal" class="modal">
+<div id="confirmModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
     <div class="modal-content confirm-modal-content">
-        <h2>Confirm Delete</h2>
+        <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <h2 class="modal-title">Confirm Delete</h2>
         <div class="modal-body">
-            <p id="confirmModalMessage">Are you sure you want to delete this task?</p>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-danger" id="confirmModalOk">Delete</button>
-                <button type="button" class="btn btn-secondary" id="confirmModalCancel">Cancel</button>
+            <p id="confirmModalMessage">Are you sure you want to delete this task? This action cannot be undone.</p>
+            <div class="modal-actions modal-actions-centered">
+                <button type="button" class="btn btn-ghost" id="confirmModalCancel">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalOk">
+                    <i class="fa-solid fa-trash-can"></i> Delete
+                </button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Toast Notification -->
-<div id="toastNotification" class="toast" role="alert" aria-live="assertive"></div>
+<div id="toastNotification" class="toast" role="alert" aria-live="assertive">
+    <i class="toast-icon"></i>
+    <span class="toast-message"></span>
+</div>
 
 <script>
     const colourOptions = {{ colour_options | tojson }};

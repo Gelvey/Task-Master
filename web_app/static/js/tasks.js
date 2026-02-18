@@ -21,8 +21,11 @@ const taskList = document.getElementById('taskList');
 const hasDeadlineCheckbox = document.getElementById('hasDeadline');
 const deadlineInputs = document.querySelectorAll('.deadline-inputs');
 const taskModal = document.getElementById('taskModal');
-const closeModal = document.querySelector('.close');
 const cancelEditBtn = document.getElementById('cancelEdit');
+const formPanel = document.getElementById('taskFormPanel');
+const formToggle = document.getElementById('formToggle');
+const formToggleText = document.getElementById('formToggleText');
+const submitTaskBtn = document.getElementById('submitTaskBtn');
 
 function normalizeSubtaskList(subtasks) {
     let subtaskList = subtasks;
@@ -101,6 +104,11 @@ function setupEventListeners() {
     // Task form submission
     taskForm.addEventListener('submit', handleTaskSubmit);
 
+    // Form panel toggle
+    formToggle.addEventListener('click', function () {
+        formPanel.classList.toggle('expanded');
+    });
+
     // Deadline checkbox toggle
     hasDeadlineCheckbox.addEventListener('change', function () {
         deadlineInputs.forEach(input => {
@@ -120,16 +128,30 @@ function setupEventListeners() {
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function () {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
             this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
             currentFilter = this.dataset.filter;
             renderTasks();
         });
     });
 
     // Task detail modal close
-    closeModal.addEventListener('click', () => {
+    taskModal.querySelector('.modal-close').addEventListener('click', () => {
         taskModal.classList.remove('show');
+    });
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', () => {
+            overlay.closest('.modal').classList.remove('show');
+            if (overlay.closest('#confirmModal')) {
+                pendingDeleteCallback = null;
+            }
+        });
     });
 
     // Sub-task edit modal
@@ -150,16 +172,13 @@ function setupEventListeners() {
         closeConfirmModal();
     });
 
-    // Close modals on backdrop click
-    window.addEventListener('click', (e) => {
-        if (e.target === taskModal) {
-            taskModal.classList.remove('show');
-        }
-        if (e.target === document.getElementById('subtaskEditModal')) {
-            closeSubtaskModal();
-        }
-        if (e.target === document.getElementById('confirmModal')) {
-            closeConfirmModal();
+    // Close modals on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal.show').forEach(modal => {
+                modal.classList.remove('show');
+            });
+            pendingDeleteCallback = null;
         }
     });
 
@@ -170,7 +189,8 @@ function setupEventListeners() {
         currentSubtasks = [];
         renderSubtasksList();
         cancelEditBtn.style.display = 'none';
-        document.querySelector('.task-form h2').textContent = 'Add New Task';
+        formToggleText.textContent = 'Add New Task';
+        submitTaskBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Task';
     });
 }
 
@@ -318,7 +338,11 @@ function renderTasks() {
         : tasks.filter(task => task.status === currentFilter);
 
     if (filteredTasks.length === 0) {
-        taskList.innerHTML = '<p class="empty-state">No tasks found. Add your first task above!</p>';
+        taskList.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-regular fa-clipboard"></i>
+                <p>No tasks found. Create your first task above!</p>
+            </div>`;
         return;
     }
 
@@ -340,16 +364,26 @@ function renderTasks() {
         priorityGroups[priority].push(task);
     });
 
-    // Render priority sections in order
+    // Priority metadata for rendering
+    const priorityMeta = {
+        'Important': { label: 'Important', dotClass: 'priority-dot-important' },
+        'Moderately Important': { label: 'Moderately Important', dotClass: 'priority-dot-moderate' },
+        'Not Important': { label: 'Not Important', dotClass: 'priority-dot-low' },
+        'default': { label: 'Other', dotClass: 'priority-dot-default' }
+    };
+
     const priorityOrder = ['Important', 'Moderately Important', 'Not Important', 'default'];
     let html = '';
 
     priorityOrder.forEach(priority => {
         if (priorityGroups[priority] && priorityGroups[priority].length > 0) {
-            const priorityLabel = priority === 'default' ? 'Other' : priority;
+            const meta = priorityMeta[priority];
             html += `
                 <div class="priority-section" data-priority="${priority}">
-                    <h3 class="priority-header">${priorityLabel}</h3>
+                    <h3 class="priority-header">
+                        <span class="priority-dot ${meta.dotClass}"></span>
+                        ${meta.label}
+                    </h3>
                     <div class="priority-tasks">
                         ${priorityGroups[priority].map(task => createTaskElement(task)).join('')}
                     </div>
@@ -391,7 +425,7 @@ function createTaskElement(task) {
                 <div class="progress-bar-container">
                     <div class="progress-bar-fill" style="width: ${percentage}%"></div>
                 </div>
-                <span class="progress-text">${completed}/${total} sub-tasks (${percentage}%)</span>
+                <span class="progress-text">${completed}/${total} (${percentage}%)</span>
             </div>
         `;
     }
@@ -403,14 +437,20 @@ function createTaskElement(task) {
                 ${progressHtml}
                 <div class="task-meta">
                     <span class="task-status status-${statusClass}">${task.status}</span>
-                    ${deadline ? `<span class="task-deadline ${isOverdue ? 'overdue' : ''}">📅 ${deadline}</span>` : ''}
-                    ${task.owner ? `<span>👤 ${escapeHtml(task.owner)}</span>` : ''}
+                    ${deadline ? `<span class="task-deadline ${isOverdue ? 'overdue' : ''}"><i class="fa-regular fa-calendar"></i> ${deadline}</span>` : ''}
+                    ${task.owner ? `<span><i class="fa-regular fa-user"></i> ${escapeHtml(task.owner)}</span>` : ''}
                 </div>
             </div>
             <div class="task-actions">
-                <button class="btn btn-sm btn-success" onclick="updateTaskStatus('${task.id}', 'Complete'); event.stopPropagation();">✓</button>
-                <button class="btn btn-sm btn-secondary" onclick="updateTaskStatus('${task.id}', 'In Progress'); event.stopPropagation();">▶</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteTask('${task.id}'); event.stopPropagation();">✕</button>
+                <button class="task-action-btn action-complete" onclick="updateTaskStatus('${task.id}', 'Complete'); event.stopPropagation();" title="Mark Complete">
+                    <i class="fa-solid fa-check"></i>
+                </button>
+                <button class="task-action-btn action-progress" onclick="updateTaskStatus('${task.id}', 'In Progress'); event.stopPropagation();" title="Set In Progress">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                <button class="task-action-btn action-delete" onclick="deleteTask('${task.id}'); event.stopPropagation();" title="Delete">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
             </div>
         </div>
     `;
@@ -492,13 +532,17 @@ async function handleTaskSubmit(e) {
         const data = await response.json();
 
         if (data.success) {
+            showToast(editingTaskId ? 'Task updated successfully' : 'Task created successfully', 'success');
             await loadTasks();
             taskForm.reset();
             editingTaskId = null;
             currentSubtasks = [];
             renderSubtasksList();
             cancelEditBtn.style.display = 'none';
-            document.querySelector('.task-form h2').textContent = 'Add New Task';
+            formToggleText.textContent = 'Add New Task';
+            submitTaskBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Task';
+            // Collapse form after successful submission
+            formPanel.classList.remove('expanded');
         } else {
             showError('Failed to save task: ' + data.error);
         }
@@ -519,6 +563,7 @@ async function updateTaskStatus(taskId, newStatus) {
         const data = await response.json();
 
         if (data.success) {
+            showToast(`Task marked as ${newStatus}`, 'success');
             await loadTasks();
         } else {
             showError('Failed to update task status: ' + data.error);
@@ -539,6 +584,7 @@ async function deleteTask(taskId) {
             const data = await response.json();
 
             if (data.success) {
+                showToast('Task deleted', 'success');
                 await loadTasks();
             } else {
                 showError('Failed to delete task: ' + data.error);
@@ -547,7 +593,7 @@ async function deleteTask(taskId) {
             showError('Error deleting task: ' + error.message);
         }
     };
-    document.getElementById('confirmModalMessage').textContent = 'Are you sure you want to delete this task?';
+    document.getElementById('confirmModalMessage').textContent = 'Are you sure you want to delete this task? This action cannot be undone.';
     document.getElementById('confirmModal').classList.add('show');
 }
 
@@ -562,19 +608,25 @@ function showTaskModal(taskId) {
     if (!task) return;
 
     document.getElementById('modalTaskName').textContent = task.name;
-    document.getElementById('modalStatus').textContent = task.status;
+
+    // Set status with badge styling
+    const statusEl = document.getElementById('modalStatus');
+    const statusClass = task.status.toLowerCase().replace(' ', '');
+    statusEl.innerHTML = `<span class="task-status status-${statusClass}">${task.status}</span>`;
+
     document.getElementById('modalDeadline').textContent = formatDeadline(task.deadline) || 'No deadline';
     document.getElementById('modalPriority').textContent = colourOptions[task.colour]?.label || 'Default';
-    document.getElementById('modalOwner').textContent = task.owner || 'None';
+    document.getElementById('modalOwner').textContent = task.owner || 'Unassigned';
     document.getElementById('modalDescription').textContent = task.description || 'No description';
 
+    const urlSection = document.getElementById('modalUrlSection');
     const urlLink = document.getElementById('modalUrl');
     if (task.url) {
         urlLink.href = task.url;
         urlLink.textContent = task.url;
-        urlLink.style.display = 'inline';
+        urlSection.style.display = 'block';
     } else {
-        urlLink.style.display = 'none';
+        urlSection.style.display = 'none';
     }
 
     // Render subtasks if available
@@ -603,7 +655,7 @@ function showTaskModal(taskId) {
             `;
         });
         subtasksHtml += '</ul>';
-        subtasksContainer.innerHTML = '<p><strong>Sub-tasks:</strong></p>' + subtasksHtml;
+        subtasksContainer.innerHTML = '<span class="detail-label"><i class="fa-solid fa-list-check"></i> Sub-tasks</span>' + subtasksHtml;
         subtasksContainer.style.display = 'block';
     } else {
         subtasksContainer.style.display = 'none';
@@ -654,11 +706,13 @@ function editTask(taskId) {
     currentSubtasks = normalizeSubtaskList((task.subtasks || []).map(st => JSON.parse(JSON.stringify(st))));
     renderSubtasksList();
 
-    cancelEditBtn.style.display = 'inline-block';
-    document.querySelector('.task-form h2').textContent = 'Edit Task';
+    cancelEditBtn.style.display = 'inline-flex';
+    formToggleText.textContent = 'Edit Task';
+    submitTaskBtn.innerHTML = '<i class="fa-solid fa-check"></i> Update Task';
 
-    // Scroll to form
-    document.querySelector('.task-form').scrollIntoView({ behavior: 'smooth' });
+    // Expand form panel and scroll to it
+    formPanel.classList.add('expanded');
+    formPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Drag and Drop Manager - Encapsulated state management
@@ -944,10 +998,16 @@ function showError(message) {
 function showToast(message, type = 'info') {
     if (toastTimer) clearTimeout(toastTimer);
     const toast = document.getElementById('toastNotification');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    toast.style.display = 'block';
-    toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 5000);
+    toast.className = `toast toast-${type} show`;
+    const msgEl = toast.querySelector('.toast-message');
+    if (msgEl) {
+        msgEl.textContent = message;
+    } else {
+        toast.textContent = message;
+    }
+    toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 4000);
 }
 
 async function toggleModalSubtask(taskId, subtaskId) {
