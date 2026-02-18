@@ -89,7 +89,7 @@ class SubtaskSelect(discord.ui.Select):
     def __init__(self, task_uuid: str, subtasks: list):
         options = []
         for st in subtasks[:25]:
-            status_emoji = "✅" if st.get("completed") else "☐"
+            status_emoji = "✅" if st.get("completed") else "⬜"
             label = f"#{st.get('id', '?')} {st.get('name', 'Unnamed')}"[:100]
             options.append(discord.SelectOption(
                 label=label,
@@ -141,7 +141,8 @@ class SubtaskActionView(discord.ui.View):
         from services.dashboard_service import DashboardService
 
         if Settings.TASK_FORUM_CHANNEL:
-            db_manager = DatabaseManager(use_firebase=not Settings.USE_LOCAL_STORAGE)
+            db_manager = DatabaseManager(
+                use_firebase=not Settings.USE_LOCAL_STORAGE)
             forum_service = ForumSyncService()
             forum_service.set_bot(interaction.client)
             forum_service.set_database(db_manager)
@@ -183,7 +184,8 @@ class SubtaskActionView(discord.ui.View):
     @discord.ui.button(label="🗑️ Delete Sub-task", style=discord.ButtonStyle.danger)
     async def delete(self, interaction: discord.Interaction, button: Button):
         subtask_name = self._subtask.get("name", "Unnamed sub-task")
-        confirm_view = ConfirmationButtons(timeout=45, requester_id=interaction.user.id)
+        confirm_view = ConfirmationButtons(
+            timeout=45, requester_id=interaction.user.id)
         await interaction.response.edit_message(
             content=f"⚠️ Confirm delete for sub-task #{self.subtask_id}: **{subtask_name}**?",
             view=confirm_view,
