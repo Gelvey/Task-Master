@@ -835,3 +835,109 @@ input[type="checkbox"] {
 .subtask-add-control .btn {
     flex-shrink: 0;
 }
+
+/* Field Validation */
+.field-error {
+    color: #F85149;
+    font-size: 0.85em;
+    margin-top: 4px;
+    display: block;
+    min-height: 1.1em;
+}
+
+.required-mark {
+    color: var(--danger-red);
+}
+
+/* Sub-task Edit Modal */
+.subtask-edit-modal-content {
+    max-width: 480px;
+}
+
+.subtask-edit-modal-content .form-group {
+    margin-bottom: 16px;
+}
+
+/* Confirm Delete Modal */
+.confirm-modal-content {
+    max-width: 420px;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    background: var(--github-dark-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 20px;
+    color: var(--soft-white);
+    font-size: 0.9em;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    max-width: 360px;
+    word-break: break-word;
+    animation: fadeIn 0.2s ease;
+}
+
+.toast.toast-error {
+    border-left: 4px solid var(--danger-red);
+    background: rgba(218, 54, 51, 0.1);
+}
+
+.toast.toast-success {
+    border-left: 4px solid var(--success-green);
+    background: rgba(35, 134, 54, 0.1);
+}
+
+/* Subtask row layout in form editor */
+.subtask-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.subtask-form-extras {
+    padding-left: 28px;
+    margin-top: 4px;
+}
+
+.subtask-form-detail {
+    color: #8B949E;
+    font-size: 0.85em;
+    margin-top: 2px;
+    word-break: break-all;
+}
+
+.subtask-form-detail a {
+    color: #58A6FF;
+    text-decoration: none;
+}
+
+.subtask-form-detail a:hover {
+    text-decoration: underline;
+}
+
+.subtasks-form-list li.subtask-done .subtask-name {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* Interactive subtask toggle in detail modal */
+.subtask-toggle {
+    cursor: pointer;
+    user-select: none;
+    font-size: 1.1em;
+    margin-right: 6px;
+    transition: opacity 0.2s;
+}
+
+.subtask-toggle:hover {
+    opacity: 0.7;
+}
+
+.subtask-item.completed .subtask-main {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
