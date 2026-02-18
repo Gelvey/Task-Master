@@ -12,6 +12,7 @@ from utils.validators import (
     validate_url,
     format_deadline_for_display,
 )
+from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,17 @@ async def _send_ephemeral_reply(interaction: discord.Interaction, content: str):
     """Send an ephemeral message safely for modal interactions."""
     try:
         if interaction.response.is_done():
-            await interaction.followup.send(content, ephemeral=True)
+            await interaction.followup.send(
+                content,
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
         else:
-            await interaction.response.send_message(content, ephemeral=True)
+            await interaction.response.send_message(
+                content,
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
     except discord.NotFound:
         logger.warning("Interaction expired before reply could be sent")
     except discord.HTTPException as exc:
@@ -137,6 +146,7 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
             await interaction.response.send_message(
                 "❌ Invalid deadline format. Use DD-MM-YYYY HH:MM AM/PM (example: 16-02-2026 09:30 PM).",
                 ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
             return
 
@@ -145,6 +155,7 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
             await interaction.response.send_message(
                 "❌ Invalid URL format. Use a full URL starting with http:// or https://.",
                 ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
             return
 
@@ -227,6 +238,7 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
             await interaction.response.send_message(
                 "❌ Invalid URL format. Use a full URL starting with http:// or https://.",
                 ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
             return
 
@@ -245,7 +257,8 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
             )
 
             if Settings.TASK_FORUM_CHANNEL:
-                db_manager = DatabaseManager(use_firebase=not Settings.USE_LOCAL_STORAGE)
+                db_manager = DatabaseManager(
+                    use_firebase=not Settings.USE_LOCAL_STORAGE)
                 forum_service = ForumSyncService()
                 forum_service.set_bot(interaction.client)
                 forum_service.set_database(db_manager)
@@ -313,7 +326,11 @@ class ConfigureSubtaskModal(ui.Modal):
 
         name = (self.subtask_name.value or '').strip()
         if not name:
-            await interaction.response.send_message("❌ Sub-task name is required.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Sub-task name is required.",
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
             return
 
         url = (self.subtask_url.value or '').strip()
@@ -321,6 +338,7 @@ class ConfigureSubtaskModal(ui.Modal):
             await interaction.response.send_message(
                 "❌ Invalid URL format. Use a full URL starting with http:// or https://.",
                 ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
             return
 

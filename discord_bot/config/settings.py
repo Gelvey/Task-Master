@@ -44,6 +44,8 @@ class Settings:
         os.getenv("BOT_STATUS_REFRESH_INTERVAL", "90"))
     BOT_STATUS_ENABLED: bool = os.getenv(
         "BOT_STATUS_ENABLED", "true").lower() == "true"
+    EPHEMERAL_DELETE_AFTER: int = int(
+        os.getenv("EPHEMERAL_DELETE_AFTER", "10"))
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -121,6 +123,11 @@ class Settings:
             logger.warning(
                 "BOT_STATUS_REFRESH_INTERVAL must be > 0. Falling back to 90 seconds.")
             cls.BOT_STATUS_REFRESH_INTERVAL = 90
+
+        if cls.EPHEMERAL_DELETE_AFTER <= 0:
+            logger.warning(
+                "EPHEMERAL_DELETE_AFTER must be > 0. Falling back to 10 seconds.")
+            cls.EPHEMERAL_DELETE_AFTER = 10
 
         logger.info(f"Loaded settings: username='{cls.TASKMASTER_USERNAME}', "
                     f"{len(cls.OWNERS)} owners, {len(cls.USER_MAPPING)} user mappings")

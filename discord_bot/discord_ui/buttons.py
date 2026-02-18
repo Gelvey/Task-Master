@@ -4,6 +4,7 @@ Discord button components for task interactions
 import logging
 import discord
 from discord.ui import Button, View
+from config.settings import Settings
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,8 @@ class ConfirmationButtons(View):
         if self.requester_id is not None and interaction.user.id != self.requester_id:
             await interaction.response.send_message(
                 "❌ Only the user who requested this action can confirm it.",
-                ephemeral=True
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
             return False
         return True
@@ -57,7 +59,11 @@ class ConfigureTaskButton(discord.ui.Button):
         task_service = TaskService()
         task = await task_service.get_task_by_uuid(self.view.task_uuid)
         if not task:
-            await interaction.response.send_message("❌ Task not found.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Task not found.",
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
             return
 
         await interaction.response.send_modal(ConfigureTaskModal(
@@ -119,7 +125,11 @@ class SubtaskSelect(discord.ui.Select):
         subtask = await task_service.get_subtask_by_id(task_uuid, subtask_id)
 
         if not subtask:
-            await interaction.followup.send("❌ Sub-task not found.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ Sub-task not found.",
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
             return
 
         status = "✅ complete" if subtask.get("completed") else "☐ incomplete"
@@ -128,6 +138,7 @@ class SubtaskSelect(discord.ui.Select):
             f"Managing sub-task **#{subtask_id}: {subtask.get('name', 'Unnamed')}** — {status}",
             view=view,
             ephemeral=True,
+            delete_after=Settings.EPHEMERAL_DELETE_AFTER,
         )
 
 
@@ -154,7 +165,11 @@ class SubtaskActionView(discord.ui.View):
                 await interaction.response.edit_message(content=content, view=view)
         except discord.NotFound:
             try:
-                await interaction.followup.send(content, ephemeral=True)
+                await interaction.followup.send(
+                    content,
+                    ephemeral=True,
+                    delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+                )
             except (discord.NotFound, discord.HTTPException) as exc:
                 logger.warning(
                     "Unable to send fallback follow-up interaction message: %s", exc)

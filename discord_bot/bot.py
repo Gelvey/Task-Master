@@ -268,7 +268,11 @@ async def help_command(interaction: discord.Interaction):
         inline=False
     )
 
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(
+        embed=embed,
+        ephemeral=True,
+        delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+    )
 
 
 @bot.tree.command(name="refresh", description="Manually refresh forum threads and dashboard")
@@ -277,7 +281,11 @@ async def refresh_taskboard(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     await forum_sync_service.sync_from_database()
     await dashboard_service.update_dashboard()
-    await interaction.followup.send("✅ Forum threads and dashboard refreshed!", ephemeral=True)
+    await interaction.followup.send(
+        "✅ Forum threads and dashboard refreshed!",
+        ephemeral=True,
+        delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+    )
 
 
 def main():

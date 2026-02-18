@@ -79,6 +79,7 @@ pip install -r requirements.txt
    - `REMINDER_CHANNEL`: Channel ID for deadline reminders
    - `BOT_STATUS_ENABLED`: Enable/disable rotating bot presence
    - `BOT_STATUS_REFRESH_INTERVAL`: Seconds between status updates
+   - `EPHEMERAL_DELETE_AFTER`: Seconds before ephemeral interaction replies auto-delete (default: 10)
    - `DISCORD_USER_*`: Map Discord user IDs to owners from OWNERS list
    - Firebase credentials (see below)
 
