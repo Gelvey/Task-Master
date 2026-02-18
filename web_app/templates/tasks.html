@@ -32,7 +32,8 @@
                     <div class="form-grid">
                         <div class="form-group form-span-2">
                             <label for="taskName">Task Name <span class="required-mark">*</span></label>
-                            <input type="text" id="taskName" class="form-control" placeholder="What needs to be done?" required>
+                            <input type="text" id="taskName" class="form-control" placeholder="What needs to be done?"
+                                required>
                         </div>
 
                         <div class="form-group">
@@ -90,7 +91,8 @@
 
                         <div class="form-group form-span-full">
                             <label for="taskUrl">URL</label>
-                            <input type="url" id="taskUrl" class="form-control" placeholder="https://example.com (optional)">
+                            <input type="url" id="taskUrl" class="form-control"
+                                placeholder="https://example.com (optional)">
                         </div>
 
                         <div class="form-group form-span-full">
@@ -126,7 +128,10 @@
             <div class="section-toolbar">
                 <h2><i class="fa-solid fa-clipboard-list"></i> Your Tasks</h2>
                 <div class="filter-buttons" role="tablist">
-                    <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">All</button>
+                    <button class="filter-btn active" data-filter="active" role="tab" aria-selected="true">
+                        <i class="fa-solid fa-bolt"></i> Active
+                    </button>
+                    <button class="filter-btn" data-filter="all" role="tab">All</button>
                     <button class="filter-btn" data-filter="To Do" role="tab">
                         <i class="fa-solid fa-circle status-icon-todo"></i> To Do
                     </button>
@@ -216,13 +221,12 @@
             </div>
             <div class="form-group">
                 <label for="subtaskEditDescription">Description</label>
-                <textarea id="subtaskEditDescription" class="form-control" rows="3"
-                    placeholder="Description (optional)" maxlength="1000"></textarea>
+                <textarea id="subtaskEditDescription" class="form-control" rows="3" placeholder="Description (optional)"
+                    maxlength="1000"></textarea>
             </div>
             <div class="form-group">
                 <label for="subtaskEditUrl">URL</label>
-                <input type="url" id="subtaskEditUrl" class="form-control"
-                    placeholder="https://example.com (optional)">
+                <input type="url" id="subtaskEditUrl" class="form-control" placeholder="https://example.com (optional)">
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-primary" id="subtaskEditSaveBtn">

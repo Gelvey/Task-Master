@@ -1,7 +1,7 @@
 // Tasks page JavaScript
 
 let tasks = [];
-let currentFilter = 'all';
+let currentFilter = 'active';
 let editingTaskId = null;
 let currentSubtasks = []; // Track subtasks in the form
 let editingSubtaskIndex = null; // Index of subtask being edited in the modal
@@ -333,9 +333,14 @@ function renderTasks() {
     // Clean up any active drag state before rendering
     DragManager.cleanup();
 
-    const filteredTasks = currentFilter === 'all'
-        ? tasks
-        : tasks.filter(task => task.status === currentFilter);
+    let filteredTasks;
+    if (currentFilter === 'all') {
+        filteredTasks = tasks;
+    } else if (currentFilter === 'active') {
+        filteredTasks = tasks.filter(task => task.status === 'To Do' || task.status === 'In Progress');
+    } else {
+        filteredTasks = tasks.filter(task => task.status === currentFilter);
+    }
 
     if (filteredTasks.length === 0) {
         taskList.innerHTML = `
