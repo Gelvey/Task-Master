@@ -271,7 +271,6 @@ async def help_command(interaction: discord.Interaction):
     await interaction.response.send_message(
         embed=embed,
         ephemeral=True,
-        delete_after=Settings.EPHEMERAL_DELETE_AFTER,
     )
 
 
