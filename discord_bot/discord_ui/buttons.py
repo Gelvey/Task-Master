@@ -1,8 +1,12 @@
 """
 Discord button components for task interactions
 """
+import logging
 import discord
 from discord.ui import Button, View
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConfirmationButtons(View):
@@ -104,6 +108,9 @@ class SubtaskSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
         subtask_id = int(self.values[0])
         task_uuid = self.view.task_uuid
 
@@ -112,12 +119,12 @@ class SubtaskSelect(discord.ui.Select):
         subtask = await task_service.get_subtask_by_id(task_uuid, subtask_id)
 
         if not subtask:
-            await interaction.response.send_message("❌ Sub-task not found.", ephemeral=True)
+            await interaction.followup.send("❌ Sub-task not found.", ephemeral=True)
             return
 
         status = "✅ complete" if subtask.get("completed") else "☐ incomplete"
         view = SubtaskActionView(task_uuid, subtask_id, subtask)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Managing sub-task **#{subtask_id}: {subtask.get('name', 'Unnamed')}** — {status}",
             view=view,
             ephemeral=True,
@@ -132,6 +139,27 @@ class SubtaskActionView(discord.ui.View):
         self.task_uuid = task_uuid
         self.subtask_id = subtask_id
         self._subtask = subtask or {}
+
+    async def _ensure_deferred(self, interaction: discord.Interaction):
+        """Acknowledge interaction before long-running work."""
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
+    async def _safe_edit_message(self, interaction: discord.Interaction, *, content: str, view=None):
+        """Safely update the ephemeral interaction message regardless of response state."""
+        try:
+            if interaction.response.is_done():
+                await interaction.edit_original_response(content=content, view=view)
+            else:
+                await interaction.response.edit_message(content=content, view=view)
+        except discord.NotFound:
+            try:
+                await interaction.followup.send(content, ephemeral=True)
+            except (discord.NotFound, discord.HTTPException) as exc:
+                logger.warning(
+                    "Unable to send fallback follow-up interaction message: %s", exc)
+        except discord.HTTPException as exc:
+            logger.warning("Failed to edit interaction message: %s", exc)
 
     async def _sync(self, interaction: discord.Interaction):
         """Trigger forum and dashboard sync after a change."""
@@ -167,18 +195,22 @@ class SubtaskActionView(discord.ui.View):
         from services.task_service import TaskService
         task_service = TaskService()
         try:
+            await self._ensure_deferred(interaction)
             subtask = await task_service.toggle_subtask_by_id(self.task_uuid, self.subtask_id)
             await self._sync(interaction)
             status = "complete" if subtask.get("completed") else "incomplete"
-            await interaction.response.edit_message(
+            await self._safe_edit_message(
+                interaction,
                 content=f"✅ Sub-task #{self.subtask_id} marked {status}.",
                 view=None,
             )
         except ValueError as e:
-            await interaction.response.edit_message(content=f"❌ {str(e)}", view=None)
+            await self._safe_edit_message(interaction, content=f"❌ {str(e)}", view=None)
         except Exception as e:
-            await interaction.response.edit_message(
-                content=f"❌ Error toggling sub-task: {str(e)}", view=None
+            await self._safe_edit_message(
+                interaction,
+                content=f"❌ Error toggling sub-task: {str(e)}",
+                view=None,
             )
 
     @discord.ui.button(label="🗑️ Delete Sub-task", style=discord.ButtonStyle.danger)
@@ -186,20 +218,22 @@ class SubtaskActionView(discord.ui.View):
         subtask_name = self._subtask.get("name", "Unnamed sub-task")
         confirm_view = ConfirmationButtons(
             timeout=45, requester_id=interaction.user.id)
-        await interaction.response.edit_message(
+        await self._safe_edit_message(
+            interaction,
             content=f"⚠️ Confirm delete for sub-task #{self.subtask_id}: **{subtask_name}**?",
             view=confirm_view,
         )
 
         timed_out = await confirm_view.wait()
         if timed_out or confirm_view.value is None:
-            await interaction.edit_original_response(
+            await self._safe_edit_message(
+                interaction,
                 content="⌛ Delete request timed out.", view=None
             )
             return
 
         if not confirm_view.value:
-            await interaction.edit_original_response(content="❎ Delete cancelled.", view=None)
+            await self._safe_edit_message(interaction, content="❎ Delete cancelled.", view=None)
             return
 
         from services.task_service import TaskService
@@ -207,12 +241,14 @@ class SubtaskActionView(discord.ui.View):
         try:
             removed = await task_service.delete_subtask_by_id(self.task_uuid, self.subtask_id)
             await self._sync(interaction)
-            await interaction.edit_original_response(
+            await self._safe_edit_message(
+                interaction,
                 content=f"✅ Deleted sub-task #{self.subtask_id}: {removed.get('name', 'Unnamed sub-task')}.",
                 view=None,
             )
         except Exception as e:
-            await interaction.edit_original_response(
+            await self._safe_edit_message(
+                interaction,
                 content=f"❌ Error deleting sub-task: {str(e)}", view=None
             )
 
