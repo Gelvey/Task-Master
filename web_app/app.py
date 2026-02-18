@@ -364,6 +364,12 @@ def index():
     return redirect(url_for('login'))
 
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon at root path for browser compatibility"""
+    return app.send_static_file('favicon/favicon.ico')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page"""
