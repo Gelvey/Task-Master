@@ -246,7 +246,7 @@ class TaskService:
         await self._trigger_forum_sync()
         return existing
 
-    async def add_subtask(self, task_uuid: str, subtask_name: str):
+    async def add_subtask(self, task_uuid: str, subtask_name: str, description: str = "", url: str = ""):
         """Add a subtask to a task"""
         task = await self.get_task_by_uuid(task_uuid)
         if not task:
@@ -258,8 +258,8 @@ class TaskService:
         new_subtask = {
             "id": next_id,
             "name": subtask_name.strip(),
-            "description": "",
-            "url": "",
+            "description": description.strip() if description else "",
+            "url": url.strip() if url else "",
             "completed": False
         }
         task.subtasks.append(new_subtask)

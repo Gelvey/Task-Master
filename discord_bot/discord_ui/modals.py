@@ -184,7 +184,7 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
 
 
 class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
-    """Modal for adding a subtask to a task"""
+    """Modal for adding a new sub-task (auto-assigns the next available ID)."""
 
     def __init__(self, task_uuid: str):
         super().__init__()
@@ -194,20 +194,72 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
             label="Sub-task Name",
             placeholder="Enter sub-task name...",
             required=True,
-            max_length=200
+            max_length=200,
         )
         self.add_item(self.subtask_name)
 
+        self.subtask_description = ui.TextInput(
+            label="Description",
+            placeholder="Optional sub-task description",
+            required=False,
+            style=discord.TextStyle.paragraph,
+            max_length=1000,
+        )
+        self.add_item(self.subtask_description)
+
+        self.subtask_url = ui.TextInput(
+            label="URL",
+            placeholder="https://example.com (optional)",
+            required=False,
+            max_length=200,
+        )
+        self.add_item(self.subtask_url)
+
     async def on_submit(self, interaction: discord.Interaction):
         from services.task_service import TaskService
-        task_service = TaskService()
+        from config.settings import Settings
+        from database.firebase_manager import DatabaseManager
+        from services.forum_sync_service import ForumSyncService
+        from services.dashboard_service import DashboardService
+
+        url = (self.subtask_url.value or "").strip()
+        if url and not validate_url(url):
+            await interaction.response.send_message(
+                "❌ Invalid URL format. Use a full URL starting with http:// or https://.",
+                ephemeral=True,
+            )
+            return
+
+        description = (self.subtask_description.value or "").strip()
 
         if not await _defer_ephemeral(interaction):
             return
 
+        task_service = TaskService()
         try:
-            await task_service.add_subtask(self.task_uuid, self.subtask_name.value)
-            await _send_ephemeral_reply(interaction, f"✅ Sub-task '{self.subtask_name.value}' added successfully!")
+            await task_service.add_subtask(
+                self.task_uuid,
+                self.subtask_name.value,
+                description=description,
+                url=url,
+            )
+
+            if Settings.TASK_FORUM_CHANNEL:
+                db_manager = DatabaseManager(use_firebase=not Settings.USE_LOCAL_STORAGE)
+                forum_service = ForumSyncService()
+                forum_service.set_bot(interaction.client)
+                forum_service.set_database(db_manager)
+                await forum_service.sync_from_database()
+
+                dashboard_service = DashboardService()
+                dashboard_service.set_bot(interaction.client)
+                dashboard_service.set_database(db_manager)
+                await dashboard_service.update_dashboard()
+
+            await _send_ephemeral_reply(
+                interaction,
+                f"✅ Sub-task '{self.subtask_name.value}' added successfully!",
+            )
         except Exception as e:
             await _send_ephemeral_reply(interaction, f"❌ Error adding sub-task: {str(e)}")
 
