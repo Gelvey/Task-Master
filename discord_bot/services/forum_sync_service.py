@@ -140,7 +140,8 @@ class ForumSyncService:
 
             # Build a persistent TaskView for this task and register it so button
             # interactions survive bot restarts.
-            task_view = TaskView(task_uuid=task_uuid, subtasks=task.subtasks or [])
+            task_view = TaskView(task_uuid=task_uuid,
+                                 subtasks=task.subtasks or [])
             self._bot.add_view(task_view)
 
             if not isinstance(thread, discord.Thread):
@@ -173,7 +174,8 @@ class ForumSyncService:
             content = self._task_content(task)
             try:
                 starter_message = await thread.fetch_message(thread.id)
-                if starter_message.content != content:
+                has_components = bool(starter_message.components)
+                if starter_message.content != content or not has_components:
                     await starter_message.edit(content=content, view=task_view)
             except Exception:
                 # Fallback: post one sync snapshot if starter message isn't accessible
