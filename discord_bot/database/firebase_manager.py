@@ -4,7 +4,7 @@ Firebase database manager - uses same backend as web app and desktop client
 import os
 import json
 import logging
-from typing import List, Optional, Dict, Union, Any
+from typing import List, Optional, Dict, Union
 import firebase_admin
 from firebase_admin import credentials, db
 from .task_model import Task
