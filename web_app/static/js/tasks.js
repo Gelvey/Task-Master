@@ -4,6 +4,9 @@ let tasks = [];
 let currentFilter = 'all';
 let editingTaskId = null;
 let currentSubtasks = []; // Track subtasks in the form
+let editingSubtaskIndex = null; // Index of subtask being edited in the modal
+let pendingDeleteCallback = null; // Callback for confirm-delete modal
+let toastTimer = null; // Timer for auto-hiding toast
 
 const PRIORITY_RANK = {
     'Important': 3,
@@ -124,14 +127,39 @@ function setupEventListeners() {
         });
     });
 
-    // Modal close
+    // Task detail modal close
     closeModal.addEventListener('click', () => {
         taskModal.classList.remove('show');
     });
 
+    // Sub-task edit modal
+    document.getElementById('subtaskModalClose').addEventListener('click', closeSubtaskModal);
+    document.getElementById('subtaskEditCancelBtn').addEventListener('click', closeSubtaskModal);
+    document.getElementById('subtaskEditSaveBtn').addEventListener('click', saveSubtaskEdit);
+    document.getElementById('subtaskEditName').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); saveSubtaskEdit(); }
+    });
+
+    // Confirm delete modal
+    document.getElementById('confirmModalCancel').addEventListener('click', closeConfirmModal);
+    document.getElementById('confirmModalOk').addEventListener('click', function () {
+        if (pendingDeleteCallback) {
+            pendingDeleteCallback();
+            pendingDeleteCallback = null;
+        }
+        closeConfirmModal();
+    });
+
+    // Close modals on backdrop click
     window.addEventListener('click', (e) => {
         if (e.target === taskModal) {
             taskModal.classList.remove('show');
+        }
+        if (e.target === document.getElementById('subtaskEditModal')) {
+            closeSubtaskModal();
+        }
+        if (e.target === document.getElementById('confirmModal')) {
+            closeConfirmModal();
         }
     });
 
@@ -179,14 +207,21 @@ function renderSubtasksList() {
     let html = '<ul class="subtasks-form-list">';
     currentSubtasks.forEach((st, idx) => {
         const checkbox = st.completed ? '☑' : '☐';
-        const hasExtras = Boolean(st.description || st.url);
+        const descHtml = st.description
+            ? `<div class="subtask-form-detail">📝 ${escapeHtml(st.description)}</div>`
+            : '';
+        const urlHtml = st.url
+            ? `<div class="subtask-form-detail">🔗 <a href="${escapeHtml(st.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(st.url)}</a></div>`
+            : '';
         html += `
-            <li>
-                <span class="subtask-checkbox" onclick="toggleSubtaskInForm(${idx})">${checkbox}</span>
-                <span class="subtask-name">#${st.id} ${escapeHtml(st.name)}</span>
-                ${hasExtras ? '<span class="subtask-extra"> • details</span>' : ''}
-                <button type="button" class="btn btn-sm btn-secondary" onclick="editSubtaskInForm(${idx})">Edit</button>
-                <button type="button" class="btn-subtask-delete" onclick="deleteSubtaskFromForm(${idx})">✕</button>
+            <li class="${st.completed ? 'subtask-done' : ''}">
+                <div class="subtask-row">
+                    <span class="subtask-checkbox" onclick="toggleSubtaskInForm(${idx})">${checkbox}</span>
+                    <span class="subtask-name">#${st.id} ${escapeHtml(st.name)}</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="editSubtaskInForm(${idx})">Edit</button>
+                    <button type="button" class="btn-subtask-delete" onclick="deleteSubtaskFromForm(${idx})">✕</button>
+                </div>
+                ${(descHtml || urlHtml) ? `<div class="subtask-form-extras">${descHtml}${urlHtml}</div>` : ''}
             </li>
         `;
     });
@@ -211,27 +246,46 @@ function editSubtaskInForm(index) {
     const subtask = currentSubtasks[index];
     if (!subtask) return;
 
-    const updatedName = prompt(`Edit name for sub-task #${subtask.id}:`, subtask.name || '');
-    if (updatedName === null) return;
-    const name = updatedName.trim();
+    editingSubtaskIndex = index;
+    document.getElementById('subtaskModalTitle').textContent = `Edit Sub-task #${subtask.id}`;
+    document.getElementById('subtaskEditName').value = subtask.name || '';
+    document.getElementById('subtaskEditDescription').value = subtask.description || '';
+    document.getElementById('subtaskEditUrl').value = subtask.url || '';
+    document.getElementById('subtaskEditNameError').textContent = '';
+    document.getElementById('subtaskEditModal').classList.add('show');
+    document.getElementById('subtaskEditName').focus();
+}
+
+function closeSubtaskModal() {
+    document.getElementById('subtaskEditModal').classList.remove('show');
+    editingSubtaskIndex = null;
+}
+
+function saveSubtaskEdit() {
+    const nameInput = document.getElementById('subtaskEditName');
+    const name = nameInput.value.trim();
+    const nameError = document.getElementById('subtaskEditNameError');
+
     if (!name) {
-        alert('Sub-task name is required.');
+        nameError.textContent = 'Sub-task name is required.';
+        nameInput.focus();
         return;
     }
+    nameError.textContent = '';
 
-    const updatedDescription = prompt(`Edit description for sub-task #${subtask.id}:`, subtask.description || '');
-    if (updatedDescription === null) return;
+    const description = document.getElementById('subtaskEditDescription').value.trim();
+    const url = document.getElementById('subtaskEditUrl').value.trim();
 
-    const updatedUrl = prompt(`Edit URL for sub-task #${subtask.id}:`, subtask.url || '');
-    if (updatedUrl === null) return;
-
-    currentSubtasks[index] = {
-        ...subtask,
-        name,
-        description: updatedDescription.trim(),
-        url: updatedUrl.trim(),
-    };
-    renderSubtasksList();
+    if (editingSubtaskIndex !== null && currentSubtasks[editingSubtaskIndex]) {
+        currentSubtasks[editingSubtaskIndex] = {
+            ...currentSubtasks[editingSubtaskIndex],
+            name,
+            description,
+            url
+        };
+        renderSubtasksList();
+    }
+    closeSubtaskModal();
 }
 
 // Load tasks from API
@@ -476,25 +530,30 @@ async function updateTaskStatus(taskId, newStatus) {
 
 // Delete task
 async function deleteTask(taskId) {
-    if (!confirm('Are you sure you want to delete this task?')) {
-        return;
-    }
+    pendingDeleteCallback = async () => {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            });
 
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
+            const data = await response.json();
 
-        const data = await response.json();
-
-        if (data.success) {
-            await loadTasks();
-        } else {
-            showError('Failed to delete task: ' + data.error);
+            if (data.success) {
+                await loadTasks();
+            } else {
+                showError('Failed to delete task: ' + data.error);
+            }
+        } catch (error) {
+            showError('Error deleting task: ' + error.message);
         }
-    } catch (error) {
-        showError('Error deleting task: ' + error.message);
-    }
+    };
+    document.getElementById('confirmModalMessage').textContent = 'Are you sure you want to delete this task?';
+    document.getElementById('confirmModal').classList.add('show');
+}
+
+function closeConfirmModal() {
+    document.getElementById('confirmModal').classList.remove('show');
+    pendingDeleteCallback = null;
 }
 
 // Show task details modal
@@ -533,15 +592,18 @@ function showTaskModal(taskId) {
                 : '';
 
             subtasksHtml += `
-                <li class="subtask-item">
-                    <div class="subtask-main">${checkbox} #${subtaskId} ${escapeHtml(st.name)}</div>
+                <li class="subtask-item ${st.completed ? 'completed' : ''}">
+                    <div class="subtask-main">
+                        <span class="subtask-toggle" title="Toggle completion" onclick="toggleModalSubtask('${task.id}', ${subtaskId})">${checkbox}</span>
+                        #${subtaskId} ${escapeHtml(st.name)}
+                    </div>
                     ${descriptionHtml}
                     ${urlHtml}
                 </li>
             `;
         });
         subtasksHtml += '</ul>';
-        subtasksContainer.innerHTML = subtasksHtml;
+        subtasksContainer.innerHTML = '<p><strong>Sub-tasks:</strong></p>' + subtasksHtml;
         subtasksContainer.style.display = 'block';
     } else {
         subtasksContainer.style.display = 'none';
@@ -875,6 +937,42 @@ function escapeHtml(text) {
 }
 
 function showError(message) {
-    alert(message);
     console.error(message);
+    showToast(message, 'error');
+}
+
+function showToast(message, type = 'info') {
+    if (toastTimer) clearTimeout(toastTimer);
+    const toast = document.getElementById('toastNotification');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    toast.style.display = 'block';
+    toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 5000);
+}
+
+async function toggleModalSubtask(taskId, subtaskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updatedSubtasks = (task.subtasks || []).map(st =>
+        st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...task, subtasks: updatedSubtasks })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            await loadTasks();
+            showTaskModal(taskId);
+        } else {
+            showError('Failed to update sub-task: ' + data.error);
+        }
+    } catch (error) {
+        showError('Error updating sub-task: ' + error.message);
+    }
 }
