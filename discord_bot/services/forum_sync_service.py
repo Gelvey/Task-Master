@@ -132,6 +132,8 @@ class ForumSyncService:
         # Build a fast uuid->task lookup for the reverse-scan step below.
         uuid_to_task = {(t.uuid or t.id or t.name): t for t in tasks}
 
+        mappings_changed = False
+
         for task in tasks:
             # Keep migration-safe fallback for legacy tasks while UUID backfill propagates.
             task_uuid = task.uuid or task.id or task.name
@@ -148,7 +150,7 @@ class ForumSyncService:
                         thread_id = self.task_to_thread.pop(legacy_key)
                         self.task_to_thread[task_uuid] = thread_id
                         self.thread_to_task[str(thread_id)] = task_uuid
-                        self._save_mappings()
+                        mappings_changed = True
                         break
 
             if thread_id:
@@ -162,29 +164,45 @@ class ForumSyncService:
                             f"Could not fetch thread {thread_id} for task '{task.name}': {e}")
                         thread = None
 
-            # If the task is complete, delete its forum thread (if any) and skip it.
+            # If the task is complete, hide its forum thread and skip it.
             if task.status == "Complete":
+                removed = False
                 if isinstance(thread, discord.Thread):
                     try:
                         await thread.delete()
                         logger.info(
                             f"Deleted forum thread for completed task '{task.name}' ({task_uuid})")
+                        removed = True
                     except discord.Forbidden:
-                        logger.warning(
-                            "Missing permission to delete thread for completed task. "
-                            "Grant Manage Threads to the bot.")
+                        # Fall back to archiving + locking so the thread disappears
+                        # from the default forum view even without Manage Threads.
+                        try:
+                            await thread.edit(archived=True, locked=True)
+                            logger.info(
+                                f"Archived forum thread for completed task '{task.name}' ({task_uuid})")
+                            removed = True
+                        except Exception as archive_err:
+                            logger.warning(
+                                f"Could not delete or archive thread for completed task '{task.name}': "
+                                f"{archive_err}. Grant Manage Threads to the bot.")
                     except Exception as e:
                         logger.warning(
                             f"Failed to delete thread for completed task '{task.name}': {e}")
-                else:
+                elif thread_id:
+                    # Mapping existed but thread could not be found (deleted externally?).
+                    # Treat as successfully removed so we clean up the stale mapping.
+                    removed = True
                     logger.debug(
-                        f"No live thread found for completed task '{task.name}' ({task_uuid}); "
-                        "nothing to delete.")
-                # Always clean up the mapping regardless of whether deletion succeeded.
-                self.task_to_thread.pop(task_uuid, None)
-                if thread_id:
-                    self.thread_to_task.pop(str(thread_id), None)
-                self._save_mappings()
+                        f"Thread {thread_id} for completed task '{task.name}' no longer exists; "
+                        "cleaning stale mapping.")
+                # else: no mapping and no thread — nothing to do.
+
+                # Only clear the mapping when the thread was actually removed.
+                if removed:
+                    self.task_to_thread.pop(task_uuid, None)
+                    if thread_id:
+                        self.thread_to_task.pop(str(thread_id), None)
+                    mappings_changed = True
                 continue
 
             # Build a persistent TaskView for this task and register it so button
@@ -203,7 +221,7 @@ class ForumSyncService:
                 thread = created.thread
                 self.task_to_thread[task_uuid] = str(thread.id)
                 self.thread_to_task[str(thread.id)] = task_uuid
-                self._save_mappings()
+                mappings_changed = True
                 logger.info(
                     f"Created forum thread for task '{task.name}' ({task_uuid})")
                 continue
@@ -238,20 +256,35 @@ class ForumSyncService:
                 continue
             mapped_task = uuid_to_task.get(mapped_uuid)
             if mapped_task and mapped_task.status == "Complete":
+                removed = False
                 try:
                     await thread.delete()
                     logger.info(
                         f"Reverse-scan: deleted forum thread {thread_id_int} "
                         f"for completed task '{mapped_task.name}'")
+                    removed = True
                 except discord.Forbidden:
-                    logger.warning(
-                        f"Reverse-scan: missing permission to delete thread {thread_id_int}.")
+                    try:
+                        await thread.edit(archived=True, locked=True)
+                        logger.info(
+                            f"Reverse-scan: archived forum thread {thread_id_int} "
+                            f"for completed task '{mapped_task.name}'")
+                        removed = True
+                    except Exception as archive_err:
+                        logger.warning(
+                            f"Reverse-scan: could not delete or archive thread {thread_id_int}: "
+                            f"{archive_err}")
                 except Exception as e:
                     logger.warning(
                         f"Reverse-scan: failed to delete thread {thread_id_int}: {e}")
-                self.task_to_thread.pop(mapped_uuid, None)
-                self.thread_to_task.pop(str(thread_id_int), None)
-                self._save_mappings()
+                if removed:
+                    self.task_to_thread.pop(mapped_uuid, None)
+                    self.thread_to_task.pop(str(thread_id_int), None)
+                    mappings_changed = True
+
+        # Persist mapping changes once at the end to avoid redundant writes.
+        if mappings_changed:
+            self._save_mappings()
 
     async def handle_thread_rename(self, thread: discord.Thread):
         """Sync thread title changes back to database task name"""
