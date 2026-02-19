@@ -138,6 +138,25 @@ class ForumSyncService:
                     except Exception:
                         thread = None
 
+            # If the task is complete, close its forum thread (if any) and skip it.
+            if task.status == "Complete":
+                if isinstance(thread, discord.Thread):
+                    try:
+                        await thread.edit(archived=True, locked=True)
+                        logger.info(
+                            f"Archived forum thread for completed task '{task.name}' ({task_uuid})")
+                    except discord.Forbidden:
+                        logger.warning(
+                            "Missing permission to archive thread for completed task.")
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to archive thread for completed task '{task.name}': {e}")
+                    # Remove the mapping so a fresh thread is created if the task is re-opened.
+                    self.task_to_thread.pop(task_uuid, None)
+                    self.thread_to_task.pop(str(thread_id), None)
+                    self._save_mappings()
+                continue
+
             # Build a persistent TaskView for this task and register it so button
             # interactions survive bot restarts.
             task_view = TaskView(task_uuid=task_uuid,
