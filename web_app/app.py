@@ -36,6 +36,9 @@ logger = logging.getLogger(__name__)
 # Single-user mode - if set, username is fixed and no login required
 SINGLE_USER_MODE = os.getenv('TASKMASTER_USERNAME')
 
+# Carbon API key – allows external API access from the Carbon dashboard
+CARBON_API_KEY = os.getenv('CARBON_API_KEY')
+
 # Host/IP Whitelist configuration
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(
     ',') if os.getenv('ALLOWED_HOSTS') else []
@@ -202,14 +205,31 @@ def check_ip_whitelist():
 @app.before_request
 def ip_whitelist_check():
     """Check IP whitelist before processing any request"""
+    # Exempt valid Carbon API key requests from IP whitelist
+    auth_header = request.headers.get('Authorization', '')
+    if CARBON_API_KEY and auth_header.startswith('Bearer '):
+        if auth_header[7:] == CARBON_API_KEY:
+            return None  # Allow through — auth is handled by login_required
+
     if not check_ip_whitelist():
         return jsonify({'error': 'Access denied', 'message': 'Your IP address is not authorized'}), 403
 
 
 def login_required(f):
-    """Decorator to require login for routes (unless in single-user mode)"""
+    """Decorator to require login for routes (unless in single-user mode or valid API key)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Check for Carbon API key authentication (Bearer token)
+        auth_header = request.headers.get('Authorization', '')
+        if CARBON_API_KEY and auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            if token == CARBON_API_KEY:
+                # API key valid — use TASKMASTER_USERNAME or 'carbon' as the identity
+                session['username'] = SINGLE_USER_MODE or 'carbon'
+                return f(*args, **kwargs)
+            else:
+                return jsonify({'error': 'Invalid API key'}), 401
+
         if SINGLE_USER_MODE:
             # In single-user mode, automatically set the username
             session['username'] = SINGLE_USER_MODE
