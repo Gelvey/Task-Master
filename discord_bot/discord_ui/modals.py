@@ -1,6 +1,7 @@
 """
 Discord modal forms for task input
 """
+import asyncio
 import discord
 from discord import ui
 from typing import Optional
@@ -17,15 +18,26 @@ from config.settings import Settings
 logger = logging.getLogger(__name__)
 
 
+async def _auto_delete(msg, delay: float):
+    """Delete a message after a delay (background task)."""
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+
 async def _send_ephemeral_reply(interaction: discord.Interaction, content: str):
     """Send an ephemeral message safely for modal interactions."""
     try:
         if interaction.response.is_done():
-            await interaction.followup.send(
+            msg = await interaction.followup.send(
                 content,
                 ephemeral=True,
-                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
+            if Settings.EPHEMERAL_DELETE_AFTER:
+                asyncio.create_task(_auto_delete(
+                    msg, Settings.EPHEMERAL_DELETE_AFTER))
         else:
             await interaction.response.send_message(
                 content,

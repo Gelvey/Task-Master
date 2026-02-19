@@ -1,6 +1,7 @@
 """
 Discord button components for task interactions
 """
+import asyncio
 import logging
 import discord
 from discord.ui import Button, View
@@ -8,6 +9,15 @@ from config.settings import Settings
 
 
 logger = logging.getLogger(__name__)
+
+
+async def _auto_delete(msg, delay: float):
+    """Delete a message after a delay (background task)."""
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
 
 
 class ConfirmationButtons(View):
@@ -125,21 +135,25 @@ class SubtaskSelect(discord.ui.Select):
         subtask = await task_service.get_subtask_by_id(task_uuid, subtask_id)
 
         if not subtask:
-            await interaction.followup.send(
+            msg = await interaction.followup.send(
                 "❌ Sub-task not found.",
                 ephemeral=True,
-                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
             )
+            if Settings.EPHEMERAL_DELETE_AFTER:
+                asyncio.create_task(_auto_delete(
+                    msg, Settings.EPHEMERAL_DELETE_AFTER))
             return
 
         status = "✅ complete" if subtask.get("completed") else "☐ incomplete"
         view = SubtaskActionView(task_uuid, subtask_id, subtask)
-        await interaction.followup.send(
+        msg = await interaction.followup.send(
             f"Managing sub-task **#{subtask_id}: {subtask.get('name', 'Unnamed')}** — {status}",
             view=view,
             ephemeral=True,
-            delete_after=Settings.EPHEMERAL_DELETE_AFTER,
         )
+        if Settings.EPHEMERAL_DELETE_AFTER:
+            asyncio.create_task(_auto_delete(
+                msg, Settings.EPHEMERAL_DELETE_AFTER))
 
 
 class SubtaskActionView(discord.ui.View):
@@ -165,11 +179,13 @@ class SubtaskActionView(discord.ui.View):
                 await interaction.response.edit_message(content=content, view=view)
         except discord.NotFound:
             try:
-                await interaction.followup.send(
+                msg = await interaction.followup.send(
                     content,
                     ephemeral=True,
-                    delete_after=Settings.EPHEMERAL_DELETE_AFTER,
                 )
+                if Settings.EPHEMERAL_DELETE_AFTER:
+                    asyncio.create_task(_auto_delete(
+                        msg, Settings.EPHEMERAL_DELETE_AFTER))
             except (discord.NotFound, discord.HTTPException) as exc:
                 logger.warning(
                     "Unable to send fallback follow-up interaction message: %s", exc)

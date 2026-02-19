@@ -2,6 +2,7 @@
 Task-Master Discord Bot
 Main entry point
 """
+import asyncio
 import discord
 from discord.ext import commands, tasks
 import logging
@@ -280,11 +281,18 @@ async def refresh_taskboard(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     await forum_sync_service.sync_from_database()
     await dashboard_service.update_dashboard()
-    await interaction.followup.send(
+    msg = await interaction.followup.send(
         "✅ Forum threads and dashboard refreshed!",
         ephemeral=True,
-        delete_after=Settings.EPHEMERAL_DELETE_AFTER,
     )
+    if Settings.EPHEMERAL_DELETE_AFTER:
+        async def _delete_later():
+            await asyncio.sleep(Settings.EPHEMERAL_DELETE_AFTER)
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+        asyncio.create_task(_delete_later())
 
 
 def main():
