@@ -2,12 +2,12 @@
 Discord embed builders for task display
 """
 import discord
-from typing import List
+from typing import List, Optional
 from database.task_model import Task
 from datetime import datetime
 
 
-def create_task_board_embed(tasks: List[Task], owner: str = None, filter_status: str = None) -> discord.Embed:
+def create_task_board_embed(tasks: List[Task], owner: Optional[str] = None, filter_status: Optional[str] = None) -> discord.Embed:
     """
     Create a comprehensive task board embed
 

@@ -111,6 +111,27 @@ class ForumSyncService:
         tasks = task_service.get_all_tasks()
         tasks = sorted(tasks, key=self._task_sort_key)
 
+        # Build a lookup of all active forum threads keyed by thread id for fast access.
+        # This avoids relying solely on get_channel (which skips uncached threads).
+        live_threads: dict[int, discord.Thread] = {
+            t.id: t for t in forum_channel.threads
+        }
+
+        # Also pull threads visible from the guild's active-thread list.
+        # fetch_active_threads exists in discord.py 2.x but is absent from Pylance stubs;
+        # use getattr to avoid a false-positive reportAttributeAccessIssue.
+        try:
+            _fetch = getattr(forum_channel.guild, "fetch_active_threads", None)
+            active_threads = await _fetch() if _fetch else []
+            for t in active_threads:
+                if t.parent_id == forum_channel.id:
+                    live_threads[t.id] = t
+        except Exception as e:
+            logger.warning(f"Could not enumerate active guild threads: {e}")
+
+        # Build a fast uuid->task lookup for the reverse-scan step below.
+        uuid_to_task = {(t.uuid or t.id or t.name): t for t in tasks}
+
         for task in tasks:
             # Keep migration-safe fallback for legacy tasks while UUID backfill propagates.
             task_uuid = task.uuid or task.id or task.name
@@ -131,11 +152,14 @@ class ForumSyncService:
                         break
 
             if thread_id:
-                thread = self._bot.get_channel(int(thread_id))
+                thread = live_threads.get(int(thread_id))
                 if not isinstance(thread, discord.Thread):
+                    # Fall back to a direct API fetch for uncached threads.
                     try:
                         thread = await self._bot.fetch_channel(int(thread_id))
-                    except Exception:
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not fetch thread {thread_id} for task '{task.name}': {e}")
                         thread = None
 
             # If the task is complete, delete its forum thread (if any) and skip it.
@@ -147,14 +171,20 @@ class ForumSyncService:
                             f"Deleted forum thread for completed task '{task.name}' ({task_uuid})")
                     except discord.Forbidden:
                         logger.warning(
-                            "Missing permission to delete thread for completed task.")
+                            "Missing permission to delete thread for completed task. "
+                            "Grant Manage Threads to the bot.")
                     except Exception as e:
                         logger.warning(
                             f"Failed to delete thread for completed task '{task.name}': {e}")
-                    # Remove the mapping so a fresh thread is created if the task is re-opened.
-                    self.task_to_thread.pop(task_uuid, None)
+                else:
+                    logger.debug(
+                        f"No live thread found for completed task '{task.name}' ({task_uuid}); "
+                        "nothing to delete.")
+                # Always clean up the mapping regardless of whether deletion succeeded.
+                self.task_to_thread.pop(task_uuid, None)
+                if thread_id:
                     self.thread_to_task.pop(str(thread_id), None)
-                    self._save_mappings()
+                self._save_mappings()
                 continue
 
             # Build a persistent TaskView for this task and register it so button
@@ -199,6 +229,29 @@ class ForumSyncService:
             except Exception:
                 # Fallback: post one sync snapshot if starter message isn't accessible
                 await thread.send(content, view=task_view)
+
+        # Reverse-scan: delete any live forum threads whose mapped task is now Complete
+        # (catches threads that slipped through the main loop due to missing/stale mappings).
+        for thread_id_int, thread in list(live_threads.items()):
+            mapped_uuid = self.thread_to_task.get(str(thread_id_int))
+            if not mapped_uuid:
+                continue
+            mapped_task = uuid_to_task.get(mapped_uuid)
+            if mapped_task and mapped_task.status == "Complete":
+                try:
+                    await thread.delete()
+                    logger.info(
+                        f"Reverse-scan: deleted forum thread {thread_id_int} "
+                        f"for completed task '{mapped_task.name}'")
+                except discord.Forbidden:
+                    logger.warning(
+                        f"Reverse-scan: missing permission to delete thread {thread_id_int}.")
+                except Exception as e:
+                    logger.warning(
+                        f"Reverse-scan: failed to delete thread {thread_id_int}: {e}")
+                self.task_to_thread.pop(mapped_uuid, None)
+                self.thread_to_task.pop(str(thread_id_int), None)
+                self._save_mappings()
 
     async def handle_thread_rename(self, thread: discord.Thread):
         """Sync thread title changes back to database task name"""
