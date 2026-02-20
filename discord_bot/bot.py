@@ -255,10 +255,15 @@ async def help_command(interaction: discord.Interaction):
         inline=False
     )
 
+    reminder_text = (
+        f"You'll receive reminders in <#{Settings.REMINDER_CHANNEL}> "
+        "when task deadlines are within 24 hours."
+        if Settings.REMINDER_CHANNEL
+        else "Configure `REMINDER_CHANNEL` in `.env` to receive deadline reminders."
+    )
     embed.add_field(
         name="Reminders",
-        value=f"You'll receive reminders in <#{Settings.REMINDER_CHANNEL}> "
-        "when task deadlines are within 24 hours.",
+        value=reminder_text,
         inline=False
     )
 

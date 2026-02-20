@@ -68,11 +68,12 @@ class ReminderService:
             logger.error(f"Reminder channel {Settings.REMINDER_CHANNEL} not found")
             return
 
-        from services.task_service import TaskService
-        task_service = TaskService()
+        if not self._db:
+            logger.error("Database not set in ReminderService")
+            return
 
-        # Get all tasks
-        all_tasks = task_service.get_all_tasks()
+        # Get all tasks using the shared database manager
+        all_tasks = self._db.load_tasks(Settings.TASKMASTER_USERNAME)
 
         for task in all_tasks:
             if task.status == "Complete":
