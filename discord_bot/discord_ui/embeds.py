@@ -133,11 +133,11 @@ def create_task_detail_embed(task: Task) -> discord.Embed:
     return embed
 
 
-def create_reminder_embed(task: Task, discord_user_mention: str) -> discord.Embed:
+def create_reminder_embed(task: Task) -> discord.Embed:
     """Create embed for task deadline reminder"""
     embed = discord.Embed(
         title="⏰ Task Deadline Reminder",
-        description=f"{discord_user_mention}, you have a task approaching its deadline!",
+        description="You have a task approaching its deadline!",
         color=discord.Color.orange(),
         timestamp=datetime.now()
     )

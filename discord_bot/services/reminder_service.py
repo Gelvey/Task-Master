@@ -113,7 +113,7 @@ class ReminderService:
         """Send a reminder for an upcoming task deadline"""
         try:
             user_mention = f"<@{discord_user_id}>"
-            embed = create_reminder_embed(task, user_mention)
+            embed = create_reminder_embed(task)
             await channel.send(content=user_mention, embed=embed)
         except Exception as e:
             logger.error(f"Failed to send reminder: {e}")
@@ -122,7 +122,7 @@ class ReminderService:
         """Send notification for overdue task"""
         try:
             user_mention = f"<@{discord_user_id}>"
-            embed = create_reminder_embed(task, user_mention)
+            embed = create_reminder_embed(task)
             embed.title = "⚠️ Task is OVERDUE"
             embed.color = discord.Color.red()
             await channel.send(content=user_mention, embed=embed)
