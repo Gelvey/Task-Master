@@ -12,6 +12,7 @@ from services.dashboard_service import DashboardService
 from services.forum_sync_service import ForumSyncService
 from utils.logger import setup_logging
 from database.firebase_manager import DatabaseManager
+from services.logging_service import get_logging_service
 
 # Setup logging
 setup_logging()
@@ -106,6 +107,9 @@ async def on_ready():
 
     forum_sync_service.set_bot(bot)
     forum_sync_service.set_database(db_manager)
+
+    # Initialize audit-log service
+    get_logging_service().set_bot(bot)
 
     # Sync slash commands
     try:
@@ -264,6 +268,18 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(
         name="Reminders",
         value=reminder_text,
+        inline=False
+    )
+
+    log_text = (
+        f"All task actions (configure, rename, sub-task changes) are logged to <#{Settings.LOG_CHANNEL}> "
+        "with actor, before, and after details."
+        if Settings.LOG_CHANNEL
+        else "Configure `LOG_CHANNEL` in `.env` to enable human-readable audit logging."
+    )
+    embed.add_field(
+        name="Audit Logs",
+        value=log_text,
         inline=False
     )
 

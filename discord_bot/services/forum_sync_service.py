@@ -298,8 +298,16 @@ class ForumSyncService:
                 thread_name = thread_name[len(prefix):]
                 break
         from services.task_service import TaskService
+        from services.logging_service import get_logging_service
         task_service = TaskService()
+        old_task = await task_service.get_task_by_uuid(task_uuid)
+        old_name = old_task.name if old_task else task_uuid
         await task_service.update_task_name_by_uuid(task_uuid, thread_name)
+        if old_name != thread_name:
+            await get_logging_service().log_task_renamed(
+                old_name=old_name,
+                new_name=thread_name,
+            )
 
     async def update_description_for_thread(self, thread_id: int, description: str):
         task_uuid = self.get_task_uuid_for_thread(thread_id)
