@@ -72,6 +72,7 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
     def __init__(
         self,
         task_uuid: str,
+        task_name: str,
         current_status: str,
         current_priority: str,
         current_owner: str,
@@ -81,8 +82,13 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
     ):
         super().__init__()
         self.task_uuid = task_uuid
+        self.task_name = task_name
         self._current_status = current_status
         self._current_priority = current_priority
+        self._current_owner = current_owner
+        self._current_deadline = current_deadline
+        self._current_description = current_description
+        self._current_url = current_url
 
         self.status_priority = ui.TextInput(
             label="Status / Priority",
@@ -147,6 +153,7 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
         from database.firebase_manager import DatabaseManager
         from services.forum_sync_service import ForumSyncService
         from services.dashboard_service import DashboardService
+        from services.logging_service import get_logging_service
 
         status, priority = self._parse_status_priority()
         owner = (self.owner.value or "").strip()
@@ -201,6 +208,28 @@ class ConfigureTaskModal(ui.Modal, title="Configure Task"):
                 dashboard_service.set_database(db_manager)
                 await dashboard_service.update_dashboard()
 
+            # Audit log: show only changed fields
+            await get_logging_service().log_task_configured(
+                actor=interaction.user,
+                task_name=self.task_name,
+                before={
+                    "status": self._current_status,
+                    "priority": self._current_priority,
+                    "owner": self._current_owner,
+                    "deadline": self._current_deadline,
+                    "description": self._current_description,
+                    "url": self._current_url,
+                },
+                after={
+                    "status": status,
+                    "priority": priority,
+                    "owner": owner,
+                    "deadline": normalized_deadline or "",
+                    "description": description,
+                    "url": url,
+                },
+            )
+
             await _send_ephemeral_reply(interaction, "✅ Task configuration updated.")
         except Exception as e:
             await _send_ephemeral_reply(interaction, f"❌ Error updating task: {str(e)}")
@@ -244,6 +273,7 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
         from database.firebase_manager import DatabaseManager
         from services.forum_sync_service import ForumSyncService
         from services.dashboard_service import DashboardService
+        from services.logging_service import get_logging_service
 
         url = (self.subtask_url.value or "").strip()
         if url and not validate_url(url):
@@ -281,6 +311,19 @@ class AddSubtaskModal(ui.Modal, title="Add Sub-task"):
                 dashboard_service.set_database(db_manager)
                 await dashboard_service.update_dashboard()
 
+            # Audit log
+            task = await task_service.get_task_by_uuid(self.task_uuid)
+            task_name = task.name if task else self.task_uuid
+            await get_logging_service().log_subtask_added(
+                actor=interaction.user,
+                task_name=task_name,
+                subtask={
+                    "name": self.subtask_name.value,
+                    "description": description,
+                    "url": url,
+                },
+            )
+
             await _send_ephemeral_reply(
                 interaction,
                 f"✅ Sub-task '{self.subtask_name.value}' added successfully!",
@@ -298,6 +341,7 @@ class ConfigureSubtaskModal(ui.Modal):
         self.task_uuid = task_uuid
         self.subtask_id = subtask_id
         self._is_editing = existing_subtask is not None
+        self._before_subtask = existing_subtask or {}
 
         existing_subtask = existing_subtask or {}
 
@@ -335,6 +379,7 @@ class ConfigureSubtaskModal(ui.Modal):
         from database.firebase_manager import DatabaseManager
         from services.forum_sync_service import ForumSyncService
         from services.dashboard_service import DashboardService
+        from services.logging_service import get_logging_service
 
         name = (self.subtask_name.value or '').strip()
         if not name:
@@ -381,6 +426,32 @@ class ConfigureSubtaskModal(ui.Modal):
                 dashboard_service.set_bot(interaction.client)
                 dashboard_service.set_database(db_manager)
                 await dashboard_service.update_dashboard()
+
+            # Audit log
+            task = await task_service.get_task_by_uuid(self.task_uuid)
+            task_name = task.name if task else self.task_uuid
+            if self._is_editing:
+                await get_logging_service().log_subtask_edited(
+                    actor=interaction.user,
+                    task_name=task_name,
+                    subtask_id=self.subtask_id,
+                    before={
+                        "name": self._before_subtask.get("name", ""),
+                        "description": self._before_subtask.get("description", ""),
+                        "url": self._before_subtask.get("url", ""),
+                    },
+                    after={
+                        "name": name,
+                        "description": description,
+                        "url": url,
+                    },
+                )
+            else:
+                await get_logging_service().log_subtask_added(
+                    actor=interaction.user,
+                    task_name=task_name,
+                    subtask={"name": name, "description": description, "url": url},
+                )
 
             action = "updated" if self._is_editing else "created"
             await _send_ephemeral_reply(interaction, f"✅ Sub-task #{self.subtask_id} {action} successfully.")

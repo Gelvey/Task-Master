@@ -78,6 +78,7 @@ class ConfigureTaskButton(discord.ui.Button):
 
         await interaction.response.send_modal(ConfigureTaskModal(
             task_uuid=self.view.task_uuid,
+            task_name=task.name,
             current_status=task.status,
             current_priority=task.colour,
             current_owner=task.owner or "",
@@ -224,12 +225,25 @@ class SubtaskActionView(discord.ui.View):
     @discord.ui.button(label="✅ Toggle Completion", style=discord.ButtonStyle.success)
     async def toggle(self, interaction: discord.Interaction, button: Button):
         from services.task_service import TaskService
+        from services.logging_service import get_logging_service
         task_service = TaskService()
         try:
             await self._ensure_deferred(interaction)
             subtask = await task_service.toggle_subtask_by_id(self.task_uuid, self.subtask_id)
             await self._sync(interaction)
             status = "complete" if subtask.get("completed") else "incomplete"
+
+            # Audit log
+            task = await task_service.get_task_by_uuid(self.task_uuid)
+            task_name = task.name if task else self.task_uuid
+            await get_logging_service().log_subtask_toggled(
+                actor=interaction.user,
+                task_name=task_name,
+                subtask_id=self.subtask_id,
+                subtask_name=subtask.get("name", "Unnamed"),
+                completed=bool(subtask.get("completed")),
+            )
+
             await self._safe_edit_message(
                 interaction,
                 content=f"✅ Sub-task #{self.subtask_id} marked {status}.",
@@ -268,10 +282,22 @@ class SubtaskActionView(discord.ui.View):
             return
 
         from services.task_service import TaskService
+        from services.logging_service import get_logging_service
         task_service = TaskService()
         try:
             removed = await task_service.delete_subtask_by_id(self.task_uuid, self.subtask_id)
             await self._sync(interaction)
+
+            # Audit log
+            task = await task_service.get_task_by_uuid(self.task_uuid)
+            task_name = task.name if task else self.task_uuid
+            await get_logging_service().log_subtask_deleted(
+                actor=interaction.user,
+                task_name=task_name,
+                subtask_id=self.subtask_id,
+                subtask_name=removed.get("name", "Unnamed sub-task"),
+            )
+
             await self._safe_edit_message(
                 interaction,
                 content=f"✅ Deleted sub-task #{self.subtask_id}: {removed.get('name', 'Unnamed sub-task')}.",

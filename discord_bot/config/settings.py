@@ -20,6 +20,7 @@ class Settings:
     DASHBOARD_CHANNEL: Optional[int] = None
     TASK_FORUM_CHANNEL: Optional[int] = None
     REMINDER_CHANNEL: int = None
+    LOG_CHANNEL: Optional[int] = None
 
     # Task-Master settings
     TASKMASTER_USERNAME: str = os.getenv("TASKMASTER_USERNAME", "")
@@ -90,6 +91,20 @@ class Settings:
         if cls.REMINDER_CHANNEL is None:
             logger.warning(
                 "No REMINDER_CHANNEL configured. Deadline reminders will be disabled.")
+
+        # Parse log channel
+        log_channel_str = os.getenv("LOG_CHANNEL", "").strip()
+        if log_channel_str:
+            try:
+                cls.LOG_CHANNEL = int(log_channel_str)
+            except ValueError:
+                logger.error(
+                    "Invalid LOG_CHANNEL format. Use a single channel ID.")
+                cls.LOG_CHANNEL = None
+
+        if cls.LOG_CHANNEL is None:
+            logger.warning(
+                "No LOG_CHANNEL configured. Audit logging to Discord will be disabled.")
 
         # Parse user mappings
         for key, value in os.environ.items():
