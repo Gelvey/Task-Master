@@ -87,6 +87,10 @@ class Settings:
             except ValueError:
                 logger.error("Invalid REMINDER_CHANNEL format.")
 
+        if cls.REMINDER_CHANNEL is None:
+            logger.warning(
+                "No REMINDER_CHANNEL configured. Deadline reminders will be disabled.")
+
         # Parse user mappings
         for key, value in os.environ.items():
             if key.startswith("DISCORD_USER_"):
