@@ -112,6 +112,10 @@ async def on_ready():
     # Initialize audit-log service
     get_logging_service().set_bot(bot)
 
+    # Register persistent views so button interactions survive bot restarts
+    from discord_ui.buttons import DashboardView
+    bot.add_view(DashboardView())
+
     # Sync slash commands
     try:
         synced = await bot.tree.sync()
@@ -222,13 +226,6 @@ async def on_thread_update(before: discord.Thread, after: discord.Thread):
 
 # Slash Commands
 
-@bot.tree.command(name="create_task", description="Create a new task via a modal form")
-async def create_task_command(interaction: discord.Interaction):
-    """Command to create a new task"""
-    from discord_ui.modals import CreateTaskModal
-    await interaction.response.send_modal(CreateTaskModal())
-
-
 @bot.tree.command(name="help", description="Show help information about the Task-Master bot")
 async def help_command(interaction: discord.Interaction):
     """Show help information"""
@@ -242,6 +239,13 @@ async def help_command(interaction: discord.Interaction):
         name="Forum Mode",
         value="This bot runs in forum mode only: one thread per task in the configured task forum, "
               "plus an optional read-only dashboard channel.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Create Tasks",
+        value="Click the **➕ Create Task** button on the central dashboard to open the task creation form. "
+              "Fill in the name (required), owner, deadline, description, and URL.",
         inline=False
     )
 
@@ -294,7 +298,6 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(
         name="Slash Commands",
         value="`/help` - Show this help message\n"
-              "`/create_task` - Create a new task via a modal form\n"
               "`/refresh` - Manually refresh forum threads and dashboard",
         inline=False
     )

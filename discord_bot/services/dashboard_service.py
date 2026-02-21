@@ -54,6 +54,7 @@ class DashboardService:
             return
 
         from services.task_service import TaskService
+        from discord_ui.buttons import DashboardView
         task_service = TaskService()
         tasks = task_service.get_all_tasks()
 
@@ -73,14 +74,16 @@ class DashboardService:
         embed.add_field(name="Complete", value=str(status_counts.get("Complete", 0)), inline=True)
         embed.set_footer(text="Dashboard is bot-managed and read-only.")
 
+        view = DashboardView()
+
         if self.dashboard_message_id:
             try:
                 message = await channel.fetch_message(int(self.dashboard_message_id))
-                await message.edit(embed=embed)
+                await message.edit(embed=embed, view=view)
                 return
             except (discord.NotFound, discord.Forbidden):
                 pass
 
-        message = await channel.send(embed=embed)
+        message = await channel.send(embed=embed, view=view)
         self.dashboard_message_id = message.id
         self._save_dashboard_message_id()
