@@ -220,8 +220,6 @@ async function handleRequest(request) {
 | `SECRET_KEY` | Flask session secret key | Yes (production) |
 | `TASKMASTER_USERNAME` | Single-user mode username (skips login if set) | No |
 | `ALLOWED_HOSTS` | Comma-separated list of allowed hostnames and/or IP addresses (DNS lookup performed on each request, supports DynDNS) | No (if empty, all hosts allowed) |
-| `CORS_ORIGINS` | Comma-separated list of origins allowed to call `/api/*` routes (see [CORS](#cors-cross-origin-resource-sharing) section below) | No (if empty, no CORS headers) |
-| `CARBON_API_KEY` | API key for external API access from the Carbon dashboard (Bearer token) | No |
 | `FIREBASE_DATABASE_URL` | Firebase Realtime Database URL | No (falls back to local JSON) |
 | `FIREBASE_PROJECT_ID` | Firebase project ID | No (required if using env-based Firebase) |
 | `FIREBASE_PRIVATE_KEY_ID` | Firebase private key ID | No |
@@ -278,40 +276,15 @@ cat credentials.json | grep client_email
 
 If Firebase is not configured, the app automatically uses local JSON files stored in the `data/` directory. Each user gets their own `tasks_<username>.json` file.
 
-## CORS (Cross-Origin Resource Sharing)
-
-The `CORS_ORIGINS` environment variable controls which external origins can call the `/api/*` endpoints. This is required when an external service (e.g. Carbon) makes browser-side requests to Task-Master.
-
-### Supported Formats
-
-| Value | Effect |
-|-------|--------|
-| `*.clickdns.com.au` | Any subdomain of `clickdns.com.au` |
-| `https://carbon.clickdns.com.au` | Exact origin only |
-| `*.clickdns.com.au, https://other.example.com` | Mix of wildcard and exact origins |
-| `*` | Allow all origins (development only!) |
-| *(empty / unset)* | No CORS headers (default) |
-
-### Example
-
-```env
-# Allow all *.clickdns.com.au subdomains
-CORS_ORIGINS=*.clickdns.com.au
-
-# Multiple origins
-CORS_ORIGINS=*.clickdns.com.au, https://dashboard.example.com
-```
-
 ## Security Considerations
 
 1. **Change the SECRET_KEY** in production (use a strong random key)
 2. **Secure Firebase credentials** (never commit `credentials.json` or `.env` to version control)
 3. **Use HTTPS** in production
 4. **Host/IP Whitelist**: Set `ALLOWED_HOSTS` environment variable to restrict access to specific IPs or hostnames (supports DynDNS)
-5. **CORS**: Set `CORS_ORIGINS` to restrict cross-origin API access to trusted domains only (avoid `*` in production)
-6. **Single-User Mode**: Set `TASKMASTER_USERNAME` to enforce a fixed username
-7. **Implement proper authentication** for production use (current version uses simple username sessions)
-8. **Set up Firebase Security Rules** to restrict access:
+5. **Single-User Mode**: Set `TASKMASTER_USERNAME` to enforce a fixed username
+6. **Implement proper authentication** for production use (current version uses simple username sessions)
+7. **Set up Firebase Security Rules** to restrict access:
 
 ```json
 {
