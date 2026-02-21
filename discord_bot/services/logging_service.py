@@ -8,7 +8,7 @@ toggle/delete, task rename).
 import logging
 import discord
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class LoggingService:
         self,
         title: str,
         color: discord.Color,
-        actor: Optional[discord.User] = None,
+        actor: Optional[Union[discord.User, discord.Member]] = None,
     ) -> discord.Embed:
         embed = discord.Embed(
             title=title,
@@ -68,7 +68,7 @@ class LoggingService:
 
     async def log_task_configured(
         self,
-        actor: discord.User,
+        actor: Union[discord.User, discord.Member],
         task_name: str,
         before: dict,
         after: dict,
@@ -113,7 +113,7 @@ class LoggingService:
         self,
         old_name: str,
         new_name: str,
-        actor: Optional[discord.User] = None,
+        actor: Optional[Union[discord.User, discord.Member]] = None,
     ):
         """Log a task rename (e.g. from a thread title edit)."""
         embed = self._make_embed(
@@ -144,7 +144,7 @@ class LoggingService:
 
     async def log_subtask_added(
         self,
-        actor: discord.User,
+        actor: Union[discord.User, discord.Member],
         task_name: str,
         subtask: dict,
     ):
@@ -169,7 +169,7 @@ class LoggingService:
 
     async def log_subtask_edited(
         self,
-        actor: discord.User,
+        actor: Union[discord.User, discord.Member],
         task_name: str,
         subtask_id: int,
         before: dict,
@@ -208,7 +208,7 @@ class LoggingService:
 
     async def log_subtask_toggled(
         self,
-        actor: discord.User,
+        actor: Union[discord.User, discord.Member],
         task_name: str,
         subtask_id: int,
         subtask_name: str,
@@ -228,7 +228,7 @@ class LoggingService:
 
     async def log_subtask_deleted(
         self,
-        actor: discord.User,
+        actor: Union[discord.User, discord.Member],
         task_name: str,
         subtask_id: int,
         subtask_name: str,
