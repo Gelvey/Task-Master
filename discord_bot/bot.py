@@ -222,6 +222,13 @@ async def on_thread_update(before: discord.Thread, after: discord.Thread):
 
 # Slash Commands
 
+@bot.tree.command(name="create_task", description="Create a new task via a modal form")
+async def create_task_command(interaction: discord.Interaction):
+    """Command to create a new task"""
+    from discord_ui.modals import CreateTaskModal
+    await interaction.response.send_modal(CreateTaskModal())
+
+
 @bot.tree.command(name="help", description="Show help information about the Task-Master bot")
 async def help_command(interaction: discord.Interaction):
     """Show help information"""
@@ -287,6 +294,7 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(
         name="Slash Commands",
         value="`/help` - Show this help message\n"
+              "`/create_task` - Create a new task via a modal form\n"
               "`/refresh` - Manually refresh forum threads and dashboard",
         inline=False
     )
