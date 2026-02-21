@@ -99,6 +99,10 @@ class ForumSyncService:
         if not self._bot or Settings.TASK_FORUM_CHANNEL is None:
             return
 
+        # Reload mappings from database to avoid race conditions when multiple
+        # service instances (modal/button handlers) create threads concurrently
+        self._load_mappings()
+
         forum_channel = self._bot.get_channel(Settings.TASK_FORUM_CHANNEL)
         if not isinstance(forum_channel, discord.ForumChannel):
             logger.warning(
