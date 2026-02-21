@@ -189,41 +189,65 @@ def normalize_subtasks(subtasks):
     return normalized
 
 
+def _parse_ip(addr_str):
+    """Return an ipaddress object for addr_str, or None if it is not a valid IP."""
+    import ipaddress
+    try:
+        return ipaddress.ip_address(addr_str)
+    except ValueError:
+        return None
+
+
 def check_ip_whitelist():
-    """Check if the request IP is in the whitelist (supports both IPs and hostnames with DNS lookup)"""
+    """Check if the request IP is in the whitelist (supports both IPs and hostnames with DNS lookup).
+
+    IPv4 and IPv6 addresses are normalised via the ipaddress module before
+    comparison so that formatting differences (e.g. compressed vs. expanded
+    IPv6 notation) are handled correctly.
+    """
+    import ipaddress
+
     if not ALLOWED_HOSTS:
         return True  # No whitelist configured, allow all
 
     # Get the client IP address
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    if client_ip:
+    client_ip_raw = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip_raw:
         # X-Forwarded-For can contain multiple IPs, take the first one
-        client_ip = client_ip.split(',')[0].strip()
+        client_ip_raw = client_ip_raw.split(',')[0].strip()
+
+    client_ip_obj = _parse_ip(client_ip_raw)
 
     # Check each allowed host/IP
     for allowed_host in ALLOWED_HOSTS:
-        # If it's a direct IP match
-        if client_ip == allowed_host:
-            return True
+        allowed_ip_obj = _parse_ip(allowed_host)
 
-        # Try DNS lookup (for hostnames). No caching for DynDNS support
-        # Using getaddrinfo to support both IPv4 and IPv6
-        try:
-            # Get all IP addresses (IPv4 and IPv6) for the hostname
-            addr_info = socket.getaddrinfo(allowed_host, None)
-            resolved_ips = [addr[4][0] for addr in addr_info]
-
-            if client_ip in resolved_ips:
-                logger.info(
-                    f"Access granted for IP {client_ip} (resolved from hostname {allowed_host})")
+        if allowed_ip_obj is not None:
+            # Entry is a literal IP address — compare normalised objects
+            if client_ip_obj is not None and client_ip_obj == allowed_ip_obj:
                 return True
-        except socket.gaierror:
-            # Not a valid hostname, continue to next entry
-            pass
-        except Exception as e:
-            logger.warning(f"Error resolving hostname {allowed_host}: {e}")
+        else:
+            # Entry is a hostname — DNS-resolve it (no caching, supports DynDNS)
+            try:
+                addr_info = socket.getaddrinfo(allowed_host, None)
+                for addr in addr_info:
+                    resolved_ip_obj = _parse_ip(addr[4][0])
+                    if resolved_ip_obj is not None and client_ip_obj is not None and client_ip_obj == resolved_ip_obj:
+                        logger.info(
+                            f"Access granted for IP {client_ip_raw} (resolved from hostname {allowed_host})")
+                        return True
+                # Fallback: raw string match against unresolvable results
+                resolved_raw = [addr[4][0] for addr in addr_info]
+                if client_ip_raw in resolved_raw:
+                    logger.info(
+                        f"Access granted for IP {client_ip_raw} (raw match from hostname {allowed_host})")
+                    return True
+            except socket.gaierror:
+                pass
+            except Exception as e:
+                logger.warning(f"Error resolving hostname {allowed_host}: {e}")
 
-    logger.warning(f"Access denied for IP: {client_ip}")
+    logger.warning(f"Access denied for IP: {client_ip_raw}")
     return False
 
 
