@@ -5,16 +5,19 @@ Compatible with CloudFlare Workers deployment
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-from datetime import datetime, timedelta
 import logging
 import os
 import json
 import socket
 import uuid
 from functools import wraps
+from typing import Any
 from dotenv import load_dotenv
 
 # Try to import firebase_admin (optional)
+firebase_admin: Any = None
+credentials: Any = None
+db: Any = None
 try:
     import firebase_admin
     from firebase_admin import credentials, db
@@ -180,8 +183,6 @@ def check_ip_whitelist():
     comparison so that formatting differences (e.g. compressed vs. expanded
     IPv6 notation) are handled correctly.
     """
-    import ipaddress
-
     if not ALLOWED_HOSTS:
         return True  # No whitelist configured, allow all
 
@@ -280,7 +281,7 @@ def load_tasks(username):
         try:
             tasks_ref = db.reference(f"users/{username}/tasks")
             tasks_data = tasks_ref.get()
-            if tasks_data:
+            if isinstance(tasks_data, dict):
                 for task_id, task_data in tasks_data.items():
                     task_data['id'] = task_id
                     if not task_data.get('uuid'):

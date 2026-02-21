@@ -92,6 +92,7 @@ async def on_ready():
     """Bot startup event"""
     global db_manager
 
+    assert bot.user is not None
     logger.info(f"Bot logged in as {bot.user.name} (ID: {bot.user.id})")
     logger.info(f"Connected to {len(bot.guilds)} guild(s)")
 
@@ -305,12 +306,14 @@ async def refresh_taskboard(interaction: discord.Interaction):
     msg = await interaction.followup.send(
         "✅ Forum threads and dashboard refreshed!",
         ephemeral=True,
+        wait=True,
     )
     if Settings.EPHEMERAL_DELETE_AFTER:
         async def _delete_later():
             await asyncio.sleep(Settings.EPHEMERAL_DELETE_AFTER)
             try:
-                await msg.delete()
+                if msg is not None:
+                    await msg.delete()
             except Exception:
                 pass
         asyncio.create_task(_delete_later())
