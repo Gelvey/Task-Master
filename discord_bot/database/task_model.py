@@ -84,6 +84,9 @@ class Task:
     colour: str = "default"
     # List of subtask dictionaries
     subtasks: list = field(default_factory=list)
+    # Source that last modified this task (e.g. "Web App"). Read from DB only;
+    # not written back by to_dict so bot saves clear it naturally.
+    changed_by: str = ""
 
     def to_dict(self):
         """Convert task to dictionary for database storage"""
@@ -115,7 +118,8 @@ class Task:
             url=data.get('url', ''),
             owner=data.get('owner', ''),
             colour=data.get('colour', 'default'),
-            subtasks=normalize_subtasks(data.get('subtasks', []))
+            subtasks=normalize_subtasks(data.get('subtasks', [])),
+            changed_by=data.get('changed_by', ''),
         )
 
     @property

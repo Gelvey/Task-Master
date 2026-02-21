@@ -244,6 +244,13 @@ class ForumSyncService:
                 has_components = bool(starter_message.components)
                 if starter_message.content != content or not has_components:
                     await starter_message.edit(content=content, view=task_view)
+                    # Log external change if the task carries a changed_by label
+                    if task.changed_by and starter_message.content != content:
+                        from services.logging_service import get_logging_service
+                        await get_logging_service().log_task_updated_externally(
+                            source=task.changed_by,
+                            task_name=task.name,
+                        )
             except Exception:
                 # Fallback: post one sync snapshot if starter message isn't accessible
                 await thread.send(content, view=task_view)

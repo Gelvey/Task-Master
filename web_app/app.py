@@ -348,6 +348,7 @@ def save_tasks(username, tasks):
             'owner': task.get('owner', ''),
             'colour': task.get('colour', 'default'),
             'subtasks': normalize_subtasks(task.get('subtasks', [])),
+            'changed_by': 'Web App',
         }
 
     if USE_FIREBASE:
