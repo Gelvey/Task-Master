@@ -44,7 +44,7 @@ class TaskService:
 
     async def add_task_from_modal(self, name: str, owner: str = "", deadline: Optional[str] = None,
                                   priority: str = "default", description: str = "",
-                                  url: str = ""):
+                                  url: str = "") -> Task:
         """Add a new task from modal input"""
         task = Task(
             name=name,
@@ -58,6 +58,7 @@ class TaskService:
         self.db.add_task(self.username, task)
         logger.info(
             f"Added task '{name}' assigned to '{owner}' for user {self.username}")
+        return task
 
     async def update_task_from_modal(self, task_id: str, name: str, owner: str = "",
                                      deadline: Optional[str] = None, priority: str = "default",

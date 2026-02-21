@@ -324,3 +324,30 @@ class TaskView(discord.ui.View):
         self.add_item(AddSubtaskButton(task_uuid))
         if subtasks:
             self.add_item(SubtaskSelect(task_uuid, subtasks))
+
+
+class CreateTaskButton(discord.ui.Button):
+    """Button on the central dashboard that opens the Create Task modal."""
+
+    def __init__(self):
+        super().__init__(
+            label="➕ Create Task",
+            style=discord.ButtonStyle.success,
+            custom_id="tm:create_task",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        from discord_ui.modals import CreateTaskModal
+        await interaction.response.send_modal(CreateTaskModal())
+
+
+class DashboardView(discord.ui.View):
+    """Persistent view attached to the central dashboard message.
+
+    Contains a button to create new tasks directly from Discord.
+    Registered with ``bot.add_view()`` so interactions survive bot restarts.
+    """
+
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(CreateTaskButton())

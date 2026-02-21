@@ -112,6 +112,10 @@ async def on_ready():
     # Initialize audit-log service
     get_logging_service().set_bot(bot)
 
+    # Register persistent views so button interactions survive bot restarts
+    from discord_ui.buttons import DashboardView
+    bot.add_view(DashboardView())
+
     # Sync slash commands
     try:
         synced = await bot.tree.sync()
@@ -235,6 +239,13 @@ async def help_command(interaction: discord.Interaction):
         name="Forum Mode",
         value="This bot runs in forum mode only: one thread per task in the configured task forum, "
               "plus an optional read-only dashboard channel.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Create Tasks",
+        value="Click the **➕ Create Task** button on the central dashboard to open the task creation form. "
+              "Fill in the name (required), owner, deadline, description, and URL.",
         inline=False
     )
 

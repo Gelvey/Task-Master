@@ -66,6 +66,33 @@ class LoggingService:
             )
         return embed
 
+    async def log_task_created(
+        self,
+        actor: Union[discord.User, discord.Member],
+        task_name: str,
+        task: dict,
+    ):
+        """Log a new task being created."""
+        embed = self._make_embed(
+            f"✅ Task Created: **{task_name}**",
+            _LOG_COLORS["create"],
+            actor,
+        )
+        embed.add_field(name="By", value=actor.mention, inline=False)
+        if task.get("owner"):
+            embed.add_field(name="Owner", value=task["owner"], inline=True)
+        if task.get("deadline"):
+            embed.add_field(name="Deadline", value=task["deadline"], inline=True)
+        if task.get("description"):
+            embed.add_field(
+                name="Description",
+                value=task["description"][:_MAX_DESCRIPTION_PREVIEW],
+                inline=False,
+            )
+        if task.get("url"):
+            embed.add_field(name="URL", value=task["url"], inline=False)
+        await self._send_log(embed)
+
     async def log_task_configured(
         self,
         actor: Union[discord.User, discord.Member],

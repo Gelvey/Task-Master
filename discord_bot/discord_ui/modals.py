@@ -66,6 +66,135 @@ async def _defer_ephemeral(interaction: discord.Interaction) -> bool:
         return False
 
 
+class CreateTaskModal(ui.Modal, title="Create Task"):
+    """Modal for creating a new task via a slash command."""
+
+    def __init__(self):
+        super().__init__()
+
+        self.task_name = ui.TextInput(
+            label="Task Name",
+            placeholder="Enter task name...",
+            required=True,
+            max_length=200,
+        )
+        self.add_item(self.task_name)
+
+        self.owner = ui.TextInput(
+            label="Owner",
+            placeholder="Owner name",
+            required=False,
+            max_length=100,
+        )
+        self.add_item(self.owner)
+
+        self.deadline = ui.TextInput(
+            label="Deadline (DD-MM-YYYY HH:MM AM/PM)",
+            placeholder="16-02-2026 09:30 PM",
+            required=False,
+            max_length=50,
+        )
+        self.add_item(self.deadline)
+
+        self.description = ui.TextInput(
+            label="Description",
+            required=False,
+            style=discord.TextStyle.paragraph,
+            max_length=1000,
+        )
+        self.add_item(self.description)
+
+        self.url = ui.TextInput(
+            label="URL",
+            placeholder="https://example.com",
+            required=False,
+            max_length=200,
+        )
+        self.add_item(self.url)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from services.task_service import TaskService
+        from config.settings import Settings
+        from database.firebase_manager import DatabaseManager
+        from services.forum_sync_service import ForumSyncService
+        from services.dashboard_service import DashboardService
+        from services.logging_service import get_logging_service
+
+        name = (self.task_name.value or "").strip()
+        if not name:
+            await interaction.response.send_message(
+                "❌ Task name is required.",
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
+            return
+
+        deadline_input = (self.deadline.value or "").strip()
+        normalized_deadline = validate_deadline(
+            deadline_input) if deadline_input else None
+        if deadline_input and not normalized_deadline:
+            await interaction.response.send_message(
+                "❌ Invalid deadline format. Use DD-MM-YYYY HH:MM AM/PM (example: 16-02-2026 09:30 PM).",
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
+            return
+
+        url = (self.url.value or "").strip()
+        if url and not validate_url(url):
+            await interaction.response.send_message(
+                "❌ Invalid URL format. Use a full URL starting with http:// or https://.",
+                ephemeral=True,
+                delete_after=Settings.EPHEMERAL_DELETE_AFTER,
+            )
+            return
+
+        owner = (self.owner.value or "").strip()
+        description = (self.description.value or "").strip()
+
+        if not await _defer_ephemeral(interaction):
+            return
+
+        task_service = TaskService()
+        try:
+            task = await task_service.add_task_from_modal(
+                name=name,
+                owner=owner,
+                deadline=normalized_deadline,
+                priority="default",
+                description=description,
+                url=url,
+            )
+
+            if Settings.TASK_FORUM_CHANNEL:
+                db_manager = DatabaseManager(
+                    use_firebase=not Settings.USE_LOCAL_STORAGE)
+                forum_service = ForumSyncService()
+                forum_service.set_bot(interaction.client)
+                forum_service.set_database(db_manager)
+                await forum_service.sync_from_database()
+
+                dashboard_service = DashboardService()
+                dashboard_service.set_bot(interaction.client)
+                dashboard_service.set_database(db_manager)
+                await dashboard_service.update_dashboard()
+
+            await get_logging_service().log_task_created(
+                actor=interaction.user,
+                task_name=name,
+                task={
+                    "owner": owner,
+                    "deadline": normalized_deadline or "",
+                    "description": description,
+                    "url": url,
+                },
+            )
+
+            await _send_ephemeral_reply(interaction, f"✅ Task '**{name}**' created successfully!")
+        except Exception as e:
+            await _send_ephemeral_reply(interaction, f"❌ Error creating task: {str(e)}")
+
+
 class ConfigureTaskModal(ui.Modal, title="Configure Task"):
     """Single modal for configuring a task from within a task thread"""
 
