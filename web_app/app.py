@@ -5,10 +5,12 @@ Compatible with CloudFlare Workers deployment
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask_cors import CORS
 from datetime import datetime, timedelta
 import logging
 import os
 import json
+import re
 import socket
 import uuid
 from functools import wraps
@@ -28,6 +30,29 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SESSION_TYPE'] = 'filesystem'
+
+# CORS – configurable via CORS_ORIGINS env var.
+# Accepts a comma-separated list of allowed origins / patterns.
+#   • Exact origins:  https://carbon.clickdns.com.au
+#   • Wildcard sub-domains:  *.clickdns.com.au  (converted to a regex)
+#   • "*" to allow all origins (development only!)
+# Default (when unset): no CORS headers.
+_cors_raw = os.getenv('CORS_ORIGINS', '')
+if _cors_raw.strip():
+    _cors_origins = []
+    for entry in _cors_raw.split(','):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if '*' in entry and entry != '*':
+            # Convert wildcard pattern like *.clickdns.com.au into a regex
+            escaped = re.escape(entry).replace(r'\*', r'[\w.-]+')
+            _cors_origins.append(re.compile(r'^https?://' + escaped + r'$'))
+        else:
+            _cors_origins.append(entry)
+    if _cors_origins:
+        CORS(app, resources={r"/api/*": {"origins": _cors_origins}},
+             supports_credentials=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
