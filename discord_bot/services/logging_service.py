@@ -61,13 +61,14 @@ class LoggingService:
         if actor:
             embed.set_footer(
                 text=f"{actor.display_name} (@{actor.name})",
-                icon_url=str(actor.display_avatar.url) if actor.display_avatar else None,
+                icon_url=str(
+                    actor.display_avatar.url) if actor.display_avatar else None,
             )
         return embed
 
     async def log_task_configured(
         self,
-        actor: discord.User,
+        actor: Optional[discord.User],
         task_name: str,
         before: dict,
         after: dict,
@@ -99,7 +100,8 @@ class LoggingService:
             _LOG_COLORS["update"],
             actor,
         )
-        embed.add_field(name="By", value=actor.mention, inline=False)
+        if actor:
+            embed.add_field(name="By", value=actor.mention, inline=False)
         for label, old_val, new_val in changes:
             embed.add_field(
                 name=label,
@@ -115,7 +117,8 @@ class LoggingService:
         actor: Optional[discord.User] = None,
     ):
         """Log a task rename (e.g. from a thread title edit)."""
-        embed = self._make_embed("✏️ Task Renamed", _LOG_COLORS["rename"], actor)
+        embed = self._make_embed(
+            "✏️ Task Renamed", _LOG_COLORS["rename"], actor)
         embed.add_field(name="Before", value=old_name, inline=True)
         embed.add_field(name="After", value=new_name, inline=True)
         if actor:
@@ -124,7 +127,7 @@ class LoggingService:
 
     async def log_subtask_added(
         self,
-        actor: discord.User,
+        actor: Optional[discord.User],
         task_name: str,
         subtask: dict,
     ):
@@ -134,7 +137,8 @@ class LoggingService:
             _LOG_COLORS["create"],
             actor,
         )
-        embed.add_field(name="By", value=actor.mention, inline=False)
+        if actor:
+            embed.add_field(name="By", value=actor.mention, inline=False)
         embed.add_field(
             name="Sub-task", value=subtask.get("name", "Unnamed"), inline=True)
         if subtask.get("description"):
@@ -149,7 +153,7 @@ class LoggingService:
 
     async def log_subtask_edited(
         self,
-        actor: discord.User,
+        actor: Optional[discord.User],
         task_name: str,
         subtask_id: int,
         before: dict,
@@ -177,7 +181,8 @@ class LoggingService:
             _LOG_COLORS["update"],
             actor,
         )
-        embed.add_field(name="By", value=actor.mention, inline=False)
+        if actor:
+            embed.add_field(name="By", value=actor.mention, inline=False)
         for label, old_val, new_val in changes:
             embed.add_field(
                 name=label,
@@ -188,7 +193,7 @@ class LoggingService:
 
     async def log_subtask_toggled(
         self,
-        actor: discord.User,
+        actor: Optional[discord.User],
         task_name: str,
         subtask_id: int,
         subtask_name: str,
@@ -201,14 +206,15 @@ class LoggingService:
             _LOG_COLORS["toggle"],
             actor,
         )
-        embed.add_field(name="By", value=actor.mention, inline=False)
+        if actor:
+            embed.add_field(name="By", value=actor.mention, inline=False)
         embed.add_field(name="Sub-task", value=subtask_name, inline=True)
         embed.add_field(name="New Status", value=status, inline=True)
         await self._send_log(embed)
 
     async def log_subtask_deleted(
         self,
-        actor: discord.User,
+        actor: Optional[discord.User],
         task_name: str,
         subtask_id: int,
         subtask_name: str,
@@ -219,7 +225,8 @@ class LoggingService:
             _LOG_COLORS["delete"],
             actor,
         )
-        embed.add_field(name="By", value=actor.mention, inline=False)
+        if actor:
+            embed.add_field(name="By", value=actor.mention, inline=False)
         embed.add_field(name="Sub-task", value=subtask_name, inline=False)
         await self._send_log(embed)
 
